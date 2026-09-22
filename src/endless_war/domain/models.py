@@ -34,6 +34,7 @@ class Faction:
     exhaustion: float = 0.0
     at_war_with: set[int] = field(default_factory=set)
     casualties: int = 0
+    exhaustion_casualty_mark: int = 0
     color_key: str = "grey"
 
 

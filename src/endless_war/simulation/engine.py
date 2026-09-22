@@ -14,7 +14,11 @@ from endless_war.config import load_config
 from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.battle import resolve_battles
 from endless_war.simulation.systems.control import apply_control_changes
-from endless_war.simulation.systems.diplomacy import update_diplomacy, update_exhaustion
+from endless_war.simulation.systems.diplomacy import (
+    note_captures,
+    update_diplomacy,
+    update_exhaustion,
+)
 from endless_war.simulation.systems.economy import update_economy, update_recruitment
 from endless_war.simulation.systems.movement import update_movement
 from endless_war.simulation.systems.supply import update_supply
@@ -47,10 +51,7 @@ class SimulationEngine:
             self.world, self.rng, self.config, battle_records
         )
         update_exhaustion(self.world, self.rng, self.config)
-        if capture_records:
-            for war in self.world.wars.values():
-                if war.status == "active":
-                    war.last_capture_tick = self.world.tick_count
+        note_captures(self.world, capture_records)
         diplomacy_events = update_diplomacy(self.world, self.rng, self.config)
         # events
         # --- SYSTEM PIPELINE END ---

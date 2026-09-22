@@ -20,16 +20,32 @@ def update_exhaustion(world: WorldState, rng: random.Random, config: dict[str, A
 
     for fid in sorted(world.factions):
         fac = world.factions[fid]
+        new_casualties = fac.casualties - fac.exhaustion_casualty_mark
+        fac.exhaustion_casualty_mark = fac.casualties
         if fac.at_war_with:
             army_strength = sum(
                 a.manpower for a in world.armies.values() if a.faction_id == fid
             )
             base = max(1, fac.manpower + army_strength)
-            fac.exhaustion = clamp(fac.exhaustion + (fac.casualties / base) * factor * 0.001)
+            fac.exhaustion = clamp(fac.exhaustion + (new_casualties / base) * factor)
         else:
             fac.exhaustion = clamp(fac.exhaustion - decay)
         fac.war_support = clamp(0.9 - fac.exhaustion * 0.8)
         fac.stability = clamp(fac.stability + (0.002 if not fac.at_war_with else -0.0005))
+
+
+def note_captures(world: WorldState, capture_records: list[dict[str, Any]]) -> None:
+    """Reset the stalemate timer of each active war in which a capture happened."""
+    for capture in capture_records:
+        taker, loser = capture["to_faction"], capture["from_faction"]
+        for war_id in sorted(world.wars):
+            war = world.wars[war_id]
+            if war.status != "active":
+                continue
+            if (taker in war.attackers and loser in war.defenders) or (
+                taker in war.defenders and loser in war.attackers
+            ):
+                war.last_capture_tick = world.tick_count
 
 
 def _strength(world: WorldState, faction_id: int) -> float:
