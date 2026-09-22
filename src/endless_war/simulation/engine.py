@@ -13,6 +13,7 @@ from typing import Any
 from endless_war.config import load_config
 from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.economy import update_economy, update_recruitment
+from endless_war.simulation.systems.supply import update_supply
 
 
 class SimulationEngine:
@@ -34,7 +35,7 @@ class SimulationEngine:
         # --- SYSTEM PIPELINE START (fixed order, do not reorder) ---
         update_economy(self.world, self.rng, self.config)
         update_recruitment(self.world, self.rng, self.config)
-        # supply
+        update_supply(self.world, self.rng, self.config)
         # AI decisions
         # movement
         # battles
