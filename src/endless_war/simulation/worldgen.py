@@ -158,4 +158,47 @@ def generate_world(seed: int, config: dict[str, Any]) -> WorldState:
     rng = random.Random(seed)
     generate_province_grid(world, rng, config)
     generate_factions(world, rng, config)
+    generate_armies(world, rng, config)
     return world
+
+
+ARMIES_PER_FACTION = 3
+
+
+def generate_armies(world: WorldState, rng: random.Random, config: dict[str, Any]) -> None:
+    """Place each faction's starting armies on its capital and border provinces."""
+    from endless_war.domain.models import Army
+
+    next_id = 0
+    for fid in sorted(world.factions):
+        fac = world.factions[fid]
+        owned = [
+            pid for pid in sorted(world.provinces)
+            if world.provinces[pid].owner_faction_id == fid
+        ]
+        border = [
+            pid for pid in owned
+            if any(
+                world.provinces[n].owner_faction_id != fid
+                for n in world.provinces[pid].neighbors
+            )
+        ]
+        placements = [fac.capital_province_id]
+        placements += rng.sample(border, k=min(ARMIES_PER_FACTION - 1, len(border)))
+        while len(placements) < ARMIES_PER_FACTION:
+            placements.append(rng.choice(owned))
+
+        for province_id in placements:
+            strength = int(fac.manpower * rng.uniform(0.08, 0.16))
+            fac.manpower = max(0, fac.manpower - strength)
+            world.armies[next_id] = Army(
+                id=next_id,
+                faction_id=fid,
+                province_id=province_id,
+                manpower=strength,
+                equipment=round(rng.uniform(0.6, 0.95), 3),
+                morale=round(rng.uniform(0.6, 0.9), 3),
+                organization=round(rng.uniform(0.7, 1.0), 3),
+                training=round(rng.uniform(0.5, 0.85), 3),
+            )
+            next_id += 1

@@ -48,6 +48,8 @@ class Army:
     organization: float = 1.0
     training: float = 1.0
     supply: float = 1.0
+    destination_id: int | None = None
+    stance: str = "balanced"
 
 
 @dataclass(slots=True)

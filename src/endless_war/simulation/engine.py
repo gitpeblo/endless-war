@@ -13,6 +13,7 @@ from typing import Any
 from endless_war.config import load_config
 from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.economy import update_economy, update_recruitment
+from endless_war.simulation.systems.movement import update_movement
 from endless_war.simulation.systems.supply import update_supply
 
 
@@ -37,7 +38,7 @@ class SimulationEngine:
         update_recruitment(self.world, self.rng, self.config)
         update_supply(self.world, self.rng, self.config)
         # AI decisions
-        # movement
+        update_movement(self.world, self.rng, self.config)
         # battles
         # control changes
         # exhaustion/stability
