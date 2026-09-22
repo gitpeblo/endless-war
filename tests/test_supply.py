@@ -1,7 +1,7 @@
 import random
 
 from endless_war.config import load_config
-from endless_war.simulation.systems.supply import update_supply
+from endless_war.simulation.systems.supply import INDUSTRIAL_SOURCE_THRESHOLD, update_supply
 from endless_war.simulation.worldgen import generate_world
 
 
@@ -19,8 +19,16 @@ def test_supply_decays_with_distance_from_capital() -> None:
     update_supply(w, random.Random(1), cfg)
     fac = w.factions[0]
     capital = w.provinces[fac.capital_province_id]
+    # The neighbour must not itself be a supply source, or it sits at cost 0
+    # like the capital and there is no decay to observe.
     neighbour = w.provinces[
-        next(n for n in capital.neighbors if w.provinces[n].controller_faction_id == fac.id)
+        next(
+            n
+            for n in capital.neighbors
+            if w.provinces[n].controller_faction_id == fac.id
+            and not w.provinces[n].is_capital
+            and w.provinces[n].industry < INDUSTRIAL_SOURCE_THRESHOLD
+        )
     ]
     assert neighbour.supply_value < capital.supply_value
 
