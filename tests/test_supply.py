@@ -49,8 +49,11 @@ def test_province_cut_off_from_its_capital_drops_to_minimum() -> None:
     # Find one of this faction's provinces that is not the capital, then hand
     # every one of its neighbours to another faction, isolating it.
     target = next(
-        p for p in w.provinces.values()
-        if p.controller_faction_id == fac.id and not p.is_capital
+        p
+        for p in w.provinces.values()
+        if p.controller_faction_id == fac.id
+        and not p.is_capital
+        and p.industry < INDUSTRIAL_SOURCE_THRESHOLD
     )
     for nid in target.neighbors:
         w.provinces[nid].controller_faction_id = 1 if fac.id != 1 else 2
