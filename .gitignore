@@ -7,3 +7,6 @@ venv/
 *.db
 /data/saves/*
 !/data/saves/.gitkeep
+
+# subagent-driven-development scratch workspace
+.superpowers/
