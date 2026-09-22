@@ -48,6 +48,7 @@ class Army:
 class WorldState:
     seed: int
     current_time: datetime
+    tick_count: int = 0
     provinces: dict[int, Province] = field(default_factory=dict)
     factions: dict[int, Faction] = field(default_factory=dict)
     armies: dict[int, Army] = field(default_factory=dict)

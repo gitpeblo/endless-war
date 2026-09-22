@@ -1,29 +1,49 @@
 """Simulation orchestration.
 
-The engine intentionally starts small. Add systems in a fixed, documented order.
+The engine owns the clock and the single seeded RNG. Systems are stateless
+functions called in the fixed order documented in docs/architecture.md.
 """
 
-from datetime import timedelta
-import random
+from __future__ import annotations
 
+import random
+from datetime import timedelta
+from typing import Any
+
+from endless_war.config import load_config
 from endless_war.domain.models import WorldState
 
 
 class SimulationEngine:
-    def __init__(self, world: WorldState) -> None:
+    def __init__(self, world: WorldState, config: dict[str, Any] | None = None) -> None:
         self.world = world
+        self.config = config or load_config()
         self.rng = random.Random(world.seed)
+        self.tick_hours: int = self.config["simulation"]["tick_hours"]
 
-    def tick(self, hours: int = 6) -> None:
-        """Advance the world by one strategic tick."""
-        self.world.current_time += timedelta(hours=hours)
-        # TODO: economy
-        # TODO: recruitment
-        # TODO: supply
-        # TODO: AI decisions
-        # TODO: movement
-        # TODO: battles
-        # TODO: control changes
-        # TODO: exhaustion/stability
-        # TODO: diplomacy
-        # TODO: events
+    def tick(self, hours: int | None = None) -> None:
+        """Advance the world by one strategic tick.
+
+        Systems run in the fixed order from docs/architecture.md. Later tasks
+        insert their calls between the markers below; do not reorder them.
+        """
+        step = self.tick_hours if hours is None else hours
+        self.world.current_time += timedelta(hours=step)
+        self.world.tick_count += 1
+        # --- SYSTEM PIPELINE START (fixed order, do not reorder) ---
+        # economy
+        # recruitment
+        # supply
+        # AI decisions
+        # movement
+        # battles
+        # control changes
+        # exhaustion/stability
+        # diplomacy
+        # events
+        # --- SYSTEM PIPELINE END ---
+
+    def run(self, ticks: int) -> None:
+        """Advance the world by `ticks` strategic ticks."""
+        for _ in range(ticks):
+            self.tick()
