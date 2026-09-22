@@ -53,6 +53,16 @@ class Army:
 
 
 @dataclass(slots=True)
+class War:
+    id: int
+    attackers: set[int]
+    defenders: set[int]
+    started_at: datetime
+    status: str = "active"
+    last_capture_tick: int = 0
+
+
+@dataclass(slots=True)
 class WorldState:
     seed: int
     current_time: datetime
@@ -61,3 +71,5 @@ class WorldState:
     provinces: dict[int, Province] = field(default_factory=dict)
     factions: dict[int, Faction] = field(default_factory=dict)
     armies: dict[int, Army] = field(default_factory=dict)
+    wars: dict[int, War] = field(default_factory=dict)
+    next_war_id: int = 0
