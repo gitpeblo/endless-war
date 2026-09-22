@@ -102,3 +102,22 @@ def test_faction_casualty_counters_accumulate() -> None:
     resolve_battles(w, random.Random(1), cfg)
     assert w.factions[0].casualties > 0
     assert w.factions[1].casualties > 0
+
+
+def test_neutral_controller_is_not_dragged_into_someone_elses_war() -> None:
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.armies.clear()
+    for fac in w.factions.values():
+        fac.at_war_with = set()
+    # Factions 1 and 2 are at war with each other; faction 0 is at peace with both.
+    w.factions[1].at_war_with = {2}
+    w.factions[2].at_war_with = {1}
+    province = w.factions[0].capital_province_id
+    for fid in (0, 1, 2):
+        w.armies[fid] = Army(id=fid, faction_id=fid, province_id=province, manpower=50_000,
+                             equipment=0.8, morale=0.8, organization=0.9,
+                             training=0.7, supply=0.9)
+    records = resolve_battles(w, random.Random(1), cfg)
+    assert all(r["defender_faction"] != 0 for r in records)
+    assert w.armies[0].manpower == 50_000, "a neutral faction must not take losses"

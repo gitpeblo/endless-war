@@ -13,7 +13,7 @@ from typing import Any
 
 from endless_war.domain.models import Army, WorldState
 from endless_war.simulation.systems import clamp
-from endless_war.simulation.systems.movement import armies_in
+from endless_war.simulation.systems.movement import armies_in, hostile_armies_in
 from endless_war.simulation.worldgen import TERRAIN_DEFENCE
 
 
@@ -62,7 +62,9 @@ def resolve_battles(
         present = [a for a in armies_in(world, pid) if a.manpower > 0]
         defender_faction = province.controller_faction_id
         defenders = [a for a in present if a.faction_id == defender_faction]
-        attackers = [a for a in present if a.faction_id != defender_faction]
+        attackers = [
+            a for a in hostile_armies_in(world, pid, defender_faction) if a.manpower > 0
+        ]
         if not defenders or not attackers:
             continue
         attacker_faction = attackers[0].faction_id
