@@ -1,0 +1,95 @@
+import random
+
+from endless_war.config import load_config
+from endless_war.domain.models import Army
+from endless_war.simulation.systems.control import apply_control_changes
+from endless_war.simulation.worldgen import generate_world
+
+
+def _border_province(w, faction_id, enemy_id):
+    """A province controlled by `faction_id` that touches `enemy_id` territory."""
+    for pid in sorted(w.provinces):
+        prov = w.provinces[pid]
+        if prov.controller_faction_id != faction_id or prov.is_capital:
+            continue
+        if any(w.provinces[n].controller_faction_id == enemy_id for n in prov.neighbors):
+            return pid
+    raise AssertionError(f"no border province between {faction_id} and {enemy_id}")
+
+
+def test_lone_army_captures_an_undefended_hostile_province() -> None:
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.armies.clear()
+    w.factions[0].at_war_with = {3}
+    w.factions[3].at_war_with = {0}
+    target = _border_province(w, 3, 0)
+    w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
+    captures = apply_control_changes(w, random.Random(1), cfg, [])
+    assert w.provinces[target].controller_faction_id == 0
+    assert captures == [{"province_id": target, "from_faction": 3, "to_faction": 0}]
+
+
+def test_owner_is_unchanged_by_occupation() -> None:
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.armies.clear()
+    w.factions[0].at_war_with = {3}
+    w.factions[3].at_war_with = {0}
+    target = _border_province(w, 3, 0)
+    w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
+    apply_control_changes(w, random.Random(1), cfg, [])
+    assert w.provinces[target].owner_faction_id == 3, "occupation must not transfer ownership"
+
+
+def test_defended_province_does_not_change_hands() -> None:
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.armies.clear()
+    w.factions[0].at_war_with = {3}
+    w.factions[3].at_war_with = {0}
+    target = _border_province(w, 3, 0)
+    w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
+    w.armies[1] = Army(id=1, faction_id=3, province_id=target, manpower=30_000)
+    apply_control_changes(w, random.Random(1), cfg, [])
+    assert w.provinces[target].controller_faction_id == 3
+
+
+def test_broken_attacker_retreats_to_a_friendly_neighbour() -> None:
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.armies.clear()
+    w.factions[0].at_war_with = {3}
+    w.factions[3].at_war_with = {0}
+    target = _border_province(w, 3, 0)
+    friendly = next(
+        n for n in w.provinces[target].neighbors if w.provinces[n].controller_faction_id == 0
+    )
+    w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000, organization=0.05)
+    apply_control_changes(w, random.Random(1), cfg, [
+        {"province_id": target, "attacker_faction": 0, "defender_faction": 3,
+         "attacker_losses": 10, "defender_losses": 10,
+         "attacker_broke": True, "defender_broke": False},
+    ])
+    assert w.armies[0].province_id == friendly
+
+
+def test_annihilated_army_is_removed() -> None:
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.armies.clear()
+    w.armies[0] = Army(id=0, faction_id=0, province_id=0, manpower=0)
+    apply_control_changes(w, random.Random(1), cfg, [])
+    assert 0 not in w.armies
+
+
+def test_province_count_is_conserved() -> None:
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.factions[0].at_war_with = {1}
+    w.factions[1].at_war_with = {0}
+    for _ in range(100):
+        apply_control_changes(w, random.Random(1), cfg, [])
+    controlled = [p.controller_faction_id for p in w.provinces.values()]
+    assert len(controlled) == 96
+    assert all(c in w.factions for c in controlled)
