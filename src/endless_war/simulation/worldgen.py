@@ -8,9 +8,11 @@ nothing downstream may assume the grid: always walk `Province.neighbors`.
 from __future__ import annotations
 
 import random
+from collections import deque
+from datetime import datetime, timezone
 from typing import Any
 
-from endless_war.domain.models import Province, WorldState
+from endless_war.domain.models import Faction, Province, WorldState
 
 # Defensive multiplier applied to the defender's power in battle.
 TERRAIN_DEFENCE: dict[str, float] = {
@@ -73,3 +75,87 @@ def generate_province_grid(
             if row < rows - 1:
                 neighbours.append(pid + cols)
             world.provinces[pid].neighbors = sorted(neighbours)
+
+
+FACTION_NAMES: list[str] = [
+    "Valdran Hegemony",
+    "Korsk Federation",
+    "Meridian Compact",
+    "Astaran Dominion",
+    "Free Cities League",
+]
+FACTION_COLORS: list[str] = ["red", "blue", "green", "amber", "violet"]
+
+
+def _pick_capitals(world: WorldState, rng: random.Random, count: int, cols: int) -> list[int]:
+    """Choose `count` well-separated provinces as capitals (greedy farthest-point)."""
+    ids = sorted(world.provinces)
+    chosen = [rng.choice(ids)]
+    while len(chosen) < count:
+        best_id, best_dist = ids[0], -1.0
+        for pid in ids:
+            if pid in chosen:
+                continue
+            row, col = divmod(pid, cols)
+            nearest = min(
+                abs(row - divmod(c, cols)[0]) + abs(col - divmod(c, cols)[1]) for c in chosen
+            )
+            if nearest > best_dist:
+                best_dist, best_id = float(nearest), pid
+        chosen.append(best_id)
+    return chosen
+
+
+def generate_factions(world: WorldState, rng: random.Random, config: dict[str, Any]) -> None:
+    """Create factions and assign contiguous starting territory."""
+    count: int = config["world"]["default_factions"]
+    cols: int = config["world"]["grid_cols"]
+    ceiling: float = config["balance"]["mobilization_ceiling"]
+    if count > len(FACTION_NAMES):
+        raise ValueError(f"only {len(FACTION_NAMES)} faction names are defined")
+
+    capitals = _pick_capitals(world, rng, count, cols)
+    for fid, capital in enumerate(capitals):
+        world.factions[fid] = Faction(
+            id=fid,
+            name=FACTION_NAMES[fid],
+            capital_province_id=capital,
+            color_key=FACTION_COLORS[fid],
+            treasury=round(rng.uniform(400_000, 900_000), 2),
+            stability=round(rng.uniform(0.55, 0.9), 3),
+            war_support=round(rng.uniform(0.35, 0.6), 3),
+        )
+        world.provinces[capital].is_capital = True
+
+    # Multi-source BFS: every province goes to the nearest capital, so each
+    # faction's territory is contiguous by construction.
+    queue: deque[int] = deque()
+    for fid, capital in enumerate(capitals):
+        world.provinces[capital].owner_faction_id = fid
+        world.provinces[capital].controller_faction_id = fid
+        queue.append(capital)
+    while queue:
+        pid = queue.popleft()
+        owner = world.provinces[pid].owner_faction_id
+        for nid in world.provinces[pid].neighbors:
+            neighbour = world.provinces[nid]
+            if neighbour.owner_faction_id is None:
+                neighbour.owner_faction_id = owner
+                neighbour.controller_faction_id = owner
+                queue.append(nid)
+
+    for fid, fac in sorted(world.factions.items()):
+        population = sum(
+            p.population for p in world.provinces.values() if p.owner_faction_id == fid
+        )
+        fac.manpower = int(population * ceiling * rng.uniform(0.35, 0.6))
+
+
+def generate_world(seed: int, config: dict[str, Any]) -> WorldState:
+    """Build a complete starting world. This is the only entry point callers need."""
+    world = WorldState(seed=seed, current_time=datetime(2030, 1, 1, tzinfo=timezone.utc))
+    world.expected_province_count = config["world"]["default_provinces"]
+    rng = random.Random(seed)
+    generate_province_grid(world, rng, config)
+    generate_factions(world, rng, config)
+    return world

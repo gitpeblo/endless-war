@@ -32,6 +32,9 @@ class Faction:
     stability: float = 1.0
     war_support: float = 0.5
     exhaustion: float = 0.0
+    at_war_with: set[int] = field(default_factory=set)
+    casualties: int = 0
+    color_key: str = "grey"
 
 
 @dataclass(slots=True)
@@ -52,6 +55,7 @@ class WorldState:
     seed: int
     current_time: datetime
     tick_count: int = 0
+    expected_province_count: int = 0
     provinces: dict[int, Province] = field(default_factory=dict)
     factions: dict[int, Faction] = field(default_factory=dict)
     armies: dict[int, Army] = field(default_factory=dict)
