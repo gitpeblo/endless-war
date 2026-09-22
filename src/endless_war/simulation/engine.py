@@ -12,6 +12,7 @@ from typing import Any
 
 from endless_war.config import load_config
 from endless_war.domain.models import WorldState
+from endless_war.simulation.systems.economy import update_economy, update_recruitment
 
 
 class SimulationEngine:
@@ -31,8 +32,8 @@ class SimulationEngine:
         self.world.current_time += timedelta(hours=step)
         self.world.tick_count += 1
         # --- SYSTEM PIPELINE START (fixed order, do not reorder) ---
-        # economy
-        # recruitment
+        update_economy(self.world, self.rng, self.config)
+        update_recruitment(self.world, self.rng, self.config)
         # supply
         # AI decisions
         # movement
