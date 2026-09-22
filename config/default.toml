@@ -1,0 +1,12 @@
+[simulation]
+tick_hours = 6
+live_tick_seconds = 1.0
+max_offline_days_per_startup = 365
+
+[world]
+default_factions = 5
+default_provinces = 96
+
+[balance]
+base_recruitment_rate = 0.001
+base_supply_decay_per_hop = 0.08
