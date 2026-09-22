@@ -6,7 +6,23 @@ max_offline_days_per_startup = 365
 [world]
 default_factions = 5
 default_provinces = 96
+grid_cols = 12
 
 [balance]
 base_recruitment_rate = 0.001
 base_supply_decay_per_hop = 0.08
+mobilization_ceiling = 0.08
+income_per_industry = 100.0
+upkeep_per_manpower = 0.002
+base_casualty_rate = 0.02
+organization_recovery_per_tick = 0.02
+morale_recovery_per_tick = 0.015
+attacker_break_organization = 0.25
+defender_break_organization = 0.20
+exhaustion_per_casualty_fraction = 1.5
+exhaustion_decay_per_tick = 0.0008
+war_declaration_strength_ratio = 1.35
+war_declaration_max_exhaustion = 0.45
+peace_exhaustion_threshold = 0.75
+peace_stalemate_ticks = 480
+min_supply = 0.05
