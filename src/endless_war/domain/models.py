@@ -17,6 +17,9 @@ class Province:
     population: int = 0
     industry: float = 0.0
     infrastructure: float = 1.0
+    terrain: str = "plains"
+    supply_value: float = 1.0
+    is_capital: bool = False
 
 
 @dataclass(slots=True)
