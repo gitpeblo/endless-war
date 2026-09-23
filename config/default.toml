@@ -2,6 +2,9 @@
 tick_hours = 6
 live_tick_seconds = 1.0
 max_offline_days_per_startup = 365
+# How many ticks the service may run in one wake-up. Caps catch-up after a
+# laptop sleep or a stalled reader so the world does not simulate a week at once.
+max_catchup_ticks_per_wake = 8
 
 [world]
 default_factions = 5
