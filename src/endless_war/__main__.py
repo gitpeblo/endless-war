@@ -1,15 +1,9 @@
-from datetime import datetime, timezone
+"""Default entry point: run the headless observation.
 
-from endless_war.domain.models import WorldState
-from endless_war.simulation.engine import SimulationEngine
+The GTK shell is Phase 6; until then `python -m endless_war` observes.
+"""
 
-
-def main() -> None:
-    world = WorldState(seed=1, current_time=datetime.now(timezone.utc))
-    sim = SimulationEngine(world)
-    sim.tick()
-    print(f"Endless War Simulator prototype: {world.current_time.isoformat()}")
-
+from endless_war.tools.observe import main
 
 if __name__ == "__main__":
     main()
