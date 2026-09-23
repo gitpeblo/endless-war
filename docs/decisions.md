@@ -39,3 +39,94 @@ The graphical interface is GTK 3 accessed from Python through PyGObject (`gi`), 
   `sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-ayatanaappindicator3-0.1`
 - **PyGObject is a system dist-package, not a wheel.** A plain `python3 -m venv` cannot see it (`ModuleNotFoundError: No module named 'gi'`). Any virtualenv used for UI work must be created with `python3 -m venv --system-site-packages` (verified working). A plain venv is fine for headless simulation and test work.
 - `ui/` code must pin namespace versions with `gi.require_version(...)` before importing from `gi.repository`, and must stay import-isolated from the simulation core per `architecture.md`.
+
+## 2026-09-23 — Simulation core balance decisions, and the ten-year checkpoint verdict
+
+**Decision:**
+Three things are recorded together, because they were settled by the same
+ten-year observation run (`python -m endless_war --years 10 --seed 42`):
+
+1. **Battle losses are driven by each side's *share* of combined power, not by a
+   raw power ratio.** `resolve_battles` computes
+   `attacker_share = att_power / (att_power + def_power)`, then
+   `attacker_rate = base_casualty_rate * 2 * (1 - attacker_share)` and
+   `defender_rate = base_casualty_rate * 2 * attacker_share`.
+2. **`base_recruitment_rate` is a convergence rate toward a ceiling, not a
+   growth rate.** `update_recruitment` adds
+   `(population * mobilization_ceiling - manpower) * base_recruitment_rate *
+   (1 - exhaustion)` men per tick.
+3. **No `[balance]` value was tuned at the checkpoint.** The ten-year history is
+   *not* interesting, but the cause is structural rather than a balance
+   problem, and tuning config would have hidden it. See Consequences.
+
+**Reason:**
+- A raw ratio (`att_power / def_power`) is unbounded: a ten-to-one advantage
+  gives a rate ten times base, and a defender reduced to near-zero power drives
+  the rate toward infinity. Share is confined to `[0, 1]` by construction, so
+  every per-tick casualty rate is confined to `[0, 2 * base_casualty_rate]` no
+  matter how lopsided the fight. That is the "bounded, explainable, stable over
+  long simulations" requirement in `docs/simulation-notes.md`.
+- A recruitment rate applied to the existing pool (`manpower * rate`) is
+  exponential and snowballs without limit. Applied to the *headroom* below a
+  population-derived ceiling it is a first-order lag: it converges on the
+  ceiling, slows as it approaches, and shrinks automatically when a faction
+  loses the provinces whose population set that ceiling. Ten years of
+  observation confirm manpower stays inside one order of magnitude.
+- On the config question: the checkpoint run showed zero battles, zero
+  casualties and zero exhaustion across all 14,600 ticks. A config sweep over
+  `war_declaration_strength_ratio` (1.0), `war_declaration_max_exhaustion`
+  (1.0), `peace_stalemate_ticks` (100000), `base_casualty_rate` (0.2),
+  `base_supply_decay_per_hop` (0.01) and a combined war-maximising config
+  produced **zero battles in every case**. No balance value can reach this
+  behaviour, so changing one would only have obscured the defect below.
+
+**Alternatives considered:**
+- *Raw power ratio for battle losses* — rejected as unbounded (above).
+- *Deterministic winner-takes-all battle resolution* — rejected: it produces
+  step-function fronts rather than the attritional give-and-take
+  `specs/01-game-design.md` asks for, and it makes casualties uninformative.
+- *Exponential recruitment with a hard cap* — rejected: the cap becomes the only
+  thing that matters, and every faction sits pinned at it within months.
+- *Lowering `war_declaration_strength_ratio` from 1.35 at the checkpoint* — this
+  was the anticipated remedy for a boring run, and it does raise war count
+  (17 → 47 over ten years at 1.0). It was rejected because wars are not the
+  missing ingredient: the wars that do start never produce a single battle.
+
+**Consequences:**
+- **The ten-year checkpoint does not pass its "is this interesting?" bar, and
+  GTK work must not start.** Seed 42, ten years: 17 wars declared, 144 provinces
+  captured, **0 battles, 0 casualties, 0 exhaustion**. Captures are 123 in year
+  one, 21 in year two and **0 in years three through ten** — the map is frozen
+  at `[18, 18, 22, 3, 35]` provinces for eight straight years while the same two
+  factions declare war on each other every four months and sign peace on the
+  stalemate timer. All invariants hold throughout; nothing explodes, but nothing
+  happens either.
+- **Root cause: battles are unreachable in the live tick pipeline.**
+  `update_movement` refuses to advance an army into a province occupied by
+  hostile armies (`if hostile_armies_in(...): continue  # blocked: the battle
+  system resolves this`), but `resolve_battles` only fires for provinces where
+  armies of two mutually hostile factions are already *co-located*. Movement is
+  the only way an army changes province, so co-location never occurs — measured
+  at 0 hostile-co-located province-ticks in 14,600 ticks, against 968 blocked
+  advances. A garrisoned border province is therefore an impassable wall, which
+  is what freezes the map.
+- Consequently `base_casualty_rate`, `attacker_break_organization`,
+  `defender_break_organization`, `exhaustion_per_casualty_fraction` and
+  `peace_exhaustion_threshold` are all currently dead config, and wars can only
+  ever end on `peace_stalemate_ticks`.
+- The intended shape of the model is visible elsewhere in the code and
+  contradicts the movement block: `resolve_battles` designates the province
+  controller as the defender and hostile armies *in that province* as
+  attackers, and `apply_control_changes` retreats a broken attacker out to a
+  friendly neighbour. Both presuppose that attackers stand inside the defended
+  province. Removing the movement block is therefore the leading candidate
+  remedy — but it is not sufficient on its own: a scratchpad experiment that
+  removed only that block produced 17 battles and ~29,000 casualties in year
+  one and then froze again, with the front calcified from year two onward. A
+  second contributor, most likely the AI's attack threshold in
+  `choose_strategic_actions` (`_defenders_in(...) < army.manpower * 1.2`, which
+  turns any adequately garrisoned province into a permanent standoff), needs
+  investigating alongside it.
+- This is left for a follow-up task deliberately. It is a change to the shape of
+  the model in Tasks 6/7/10, not a balance tweak, and the observatory committed
+  here is the instrument that will show whether a fix works.
