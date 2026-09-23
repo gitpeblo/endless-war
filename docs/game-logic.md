@@ -6,6 +6,10 @@ code that exists, with the real formulas and the config keys that tune them.
 
 Every number named here lives in `config/default.toml` unless stated otherwise.
 
+**Looking for the plain-language version?** `guides/` describes the same systems
+without formulas: the world, a day in the war, how wars work, and how to read a
+run.
+
 ## The tick
 
 One tick is **6 simulated hours** (`simulation.tick_hours`); four ticks make a

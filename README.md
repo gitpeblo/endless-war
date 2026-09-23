@@ -21,9 +21,11 @@ The same seed always produces the same history, so runs are directly comparable.
 
 ## How it works
 
-`docs/game-logic.md` describes what the simulation computes each tick — economy,
-supply, the army AI, battle resolution, and how wars start and end — with the
-actual formulas and the config values that tune them.
+Start with **[`docs/guides/`](docs/guides/README.md)** — the world, a day in the
+war, how wars work, and how to read a run. Plain language, no code.
+
+For the exact formulas and the config values that tune them, see
+`docs/game-logic.md`.
 
 ## Core experience
 
