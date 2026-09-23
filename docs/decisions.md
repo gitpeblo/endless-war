@@ -78,6 +78,37 @@ ten-year observation run (`python -m endless_war --years 10 --seed 42`):
    test_army_that_advances_does_not_recover_that_tick`,
    `tests/test_movement.py::test_army_too_disorganized_to_move_recovers` and
    `tests/test_engine.py::test_broken_army_in_safe_territory_recovers`.
+6. **Defender scoring by combat quality was ruled, implemented, measured and
+   REVERTED.** `_defenders_in` still scores a garrison by raw headcount, so
+   three zero-organization divisions read as 158,365 defenders. The fix (score
+   with `battle.effective_power`, and count only armies hostile to the mover)
+   was written with two passing regression tests, then measured over ten years
+   on three seeds and reverted because it did not clear its evidence gate. See
+   the fix round 3 addendum for the numbers. **A future session should expect
+   this to be re-applied together with a fix for capture churn, not alone.**
+
+**Refusals — do not re-litigate these without new evidence:**
+
+- **No fallback supply source.** A faction that holds neither its capital nor
+  an industrial province supplies nothing, so all its territory sits at
+  `min_supply` and its armies can never reach movement's recovery branch. That
+  is an absorbing state, and it is the direct cause of the wind-down after year
+  5. It is nonetheless *deliberate* (Task 5, `supply.py`): a rump government
+  that has lost its capital and every industrial centre being unable to project
+  force is an explainable consequence, not a bug. Ruled: the consequence stays.
+- **No manpower demobilisation or treasury sink in this branch.**
+  `specs/03-mvp.md` defers that depth and the checkpoint is met without it.
+  **Consequence, stated plainly so nobody tunes it blind:
+  `peace_exhaustion_threshold` (0.75) is currently DEAD CONFIG.** Exhaustion
+  never exceeds 0.08 in ten years and every war ends on `peace_stalemate_ticks`
+  instead. The cause is not the multiplier: exhaustion accrues as
+  `new_casualties / (faction manpower + army strength)`, and that denominator
+  grows from 1.79M to 6.92M across a decade because recruitment fills the
+  national pool while nothing moves men from the pool into armies (army share of
+  manpower falls 0.48 -> 0.07). Reaching the threshold would need roughly a 25x
+  bump to `exhaustion_per_casualty_fraction`, which would be tuning around the
+  missing reinforcement mechanic. **Fix demobilisation/reinforcement first; do
+  not raise the multiplier.**
 
 **Reason:**
 - A raw ratio (`att_power / def_power`) is unbounded: a ten-to-one advantage
@@ -248,3 +279,45 @@ of manpower falls 0.48 → 0.07). Raising `exhaustion_per_casualty_fraction` by
 the ~25x needed would be tuning around the ledgered manpower-demobilisation
 defect, not balancing. Fix the reinforcement gap first; exhaustion should then
 work at something near its current value.
+
+### Fix round 3 addendum (same day) — defender scoring: measured, reverted, parked
+
+Quality-based defender scoring was implemented exactly as ruled (score with
+`battle.effective_power`; count only armies hostile to the mover) with two
+passing regression tests, then measured over ten years on three seeds against
+the round 2 baseline. It was reverted because it did not clear its gate.
+
+| Seed | Variant | Battles (years with one) | Captures | Casualties | Map changed | Max prov | Events |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 42 | headcount | 60 (6/10) | 620 | 103,468 | 6/9 | 34 | 670 |
+| 42 | **quality** | **163 (9/10)** | **4,416** | **270,369** | **4/9** | 38 | **2000 (cap)** |
+| 7 | headcount | 146 (8/10) | 475 | 117,407 | 5/9 | 46 | 534 |
+| 7 | **quality** | **259 (9/10)** | 581 | 185,920 | **8/9** | 46 | 649 |
+| 99 | headcount | 235 (10/10) | 993 | 228,222 | 9/9 | 42 | 1088 |
+| 99 | **quality** | 168 (8/10) | 635 | 150,998 | 7/9 | 34 | 722 |
+
+The gate was "as good or better than round 2: battles spread across multiple
+years, the map still changing in most years, no faction running away, invariants
+clean." On the canonical seed 42 the change is clearly better on combat
+(60 → 163 battles, 6 → 9 years with fighting, casualties 103k → 270k) and
+clearly worse on territory (map changes in 4 of 9 year transitions, down from 6)
+and on log readability (the event deque **hits its 2000 cap**, against 670
+before). Across seeds it is a wash: better on 7, worse on 99. "As good or
+better" was therefore not established, so it was reverted per the ruling.
+
+**The finding that matters more than the verdict — capture churn.** Seed 42
+under quality scoring produced **4,416 captures from only 163 battles**: roughly
+4,250 bloodless walk-in flips, adjacent armies alternately occupying the same
+undefended province forever. That is what saturates the event log and what makes
+net territory look frozen while the front thrashes. The pathology **pre-exists
+this change** in milder form — round 2 already ran 620 captures against 60
+battles, a 10:1 ratio — and it is the likely reason territory freezes while
+fighting continues. Quality scoring amplified it on one seed rather than causing
+it. A future session should fix churn (an undefended province should not be
+able to change hands every other tick) and re-apply defender scoring together
+with it.
+
+**Correction to the round 2 addendum:** it stated the map changed in "9 of 10
+years" at seed 42. That was eyeballed from the printed tables and is wrong; the
+programmatic count is **6 of 9 year-over-year transitions**. The round 2 verdict
+is unaffected, but the number should not be quoted.
