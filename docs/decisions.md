@@ -68,6 +68,16 @@ ten-year observation run (`python -m endless_war --years 10 --seed 42`):
    the block.** Covered by `tests/test_movement.py::
    test_move_into_hostile_province_is_the_attack` and the engine-level
    regression `tests/test_engine.py::test_armies_in_contact_produce_combat`.
+5. **The recovery rule: organization recovery is gated on whether the army
+   actually MARCHED this tick, not on whether it holds an order.** An army that
+   is under orders it cannot execute, or that holds position, rests; an army
+   that advances does not, because it already pays the `-0.03` march cost. And
+   **the AI no longer orders a broken army to withdraw when it is already
+   safe** -- nothing hostile adjacent, nothing hostile standing where it is.
+   Covered by `tests/test_movement.py::
+   test_army_that_advances_does_not_recover_that_tick`,
+   `tests/test_movement.py::test_army_too_disorganized_to_move_recovers` and
+   `tests/test_engine.py::test_broken_army_in_safe_territory_recovers`.
 
 **Reason:**
 - A raw ratio (`att_power / def_power`) is unbounded: a ten-to-one advantage
@@ -179,3 +189,62 @@ beyond them. That is a change to the shape of Tasks 6/10 rather than a balance
 value, so it is escalated rather than improvised, and **no `[balance]` value was
 tuned in this round either**: tuning is only meaningful once the mechanism
 sustains combat, and it does not yet.
+
+### Fix round 2 addendum (same day) — the checkpoint's stated criteria are now met
+
+Applying the recovery rule (decision 5) transformed the decade. Seed 42, ten
+years, round 1 → round 2:
+
+| Measure | Round 1 | Round 2 |
+| --- | --- | --- |
+| Battles | 17, all in year 1 | 60, spread over years 1, 3, 4, 5, 6, 8 |
+| Casualties | 29,315 | 103,468 |
+| Captures | 178 | 620 |
+| Wars declared / ended | 43 / 39 | 26 / 24 |
+| Events | 262 | 670 |
+| Years the map changed | 1 | 9 |
+| Invariant violations | 0 | 0 |
+
+Territory now swings for nine of ten years: Free Cities 15 → 33 → 3, Astaran
+27 → 44 → 30, Korsk 15 → 40 → 28, Meridian 22 → 34, Valdran 17 → 1. Wars start,
+fronts move, wars end, nothing explodes — `CONTINUE_OFFLINE.md`'s criteria are
+satisfied, with the caveat below.
+
+**Neighbour-only war declaration was ruled conditionally and is NOT needed.**
+Instrumenting all 26 declarations shows **0 were between factions that did not
+share a border**: `update_diplomacy` already draws candidates from
+`_neighbouring_factions`, computed from current controllers. The condition on
+that ruling was not met, so nothing was changed.
+
+**Remaining defect, escalated rather than fixed — the capital-loss doom
+spiral.** Years 9–10 produce no battles, and 9 of 15 armies end the run at
+`organization = 0.00, morale = 0.00, supply = 0.05`. Cause, measured at year 10:
+
+- `update_supply` gives a faction no supply at all unless it controls its
+  capital or a province with `industry >= 1.5`; every province then sits at
+  `min_supply` (0.05).
+- Valdran (1 province) and Free Cities (3 provinces) have lost their capitals
+  and hold no industrial province, so all their territory is at 0.05.
+- `update_movement` takes the low-supply penalty branch whenever supply < 0.35,
+  so those armies can *never* reach the recovery branch. Organization decays to
+  0 and stays there; below 0.15 they cannot even move.
+
+That is an absorbing state with no exit: the faction cannot fight, cannot
+recover, and cannot be finished off either, because `_defenders_in` scores a
+garrison by raw headcount and three divisions at zero organization still look
+like 158,000 defenders. It is the same class as the two defects already ruled
+on — one system's rule making another's unreachable — but the supply rule is
+documented as deliberate in Task 5 and there are credible fixes in two different
+systems, so it is left for a ruling rather than improvised.
+
+**No `[balance]` value was tuned in this round either, and exhaustion is the
+reason it would have been wrong to.** Exhaustion never exceeds 0.03 in ten
+years, so `peace_exhaustion_threshold` (0.75) remains dead config and all 24
+wars ended on the stalemate timer. But the cause is not the multiplier: exhaustion
+accrues as `new_casualties / (faction manpower + army strength)`, and that
+denominator grows from 1.79M to 6.92M over the decade because recruitment fills
+the national pool while nothing moves men from the pool into armies (army share
+of manpower falls 0.48 → 0.07). Raising `exhaustion_per_casualty_fraction` by
+the ~25x needed would be tuning around the ledgered manpower-demobilisation
+defect, not balancing. Fix the reinforcement gap first; exhaustion should then
+work at something near its current value.
