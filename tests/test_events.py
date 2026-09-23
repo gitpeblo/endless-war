@@ -58,4 +58,4 @@ def test_log_is_capped_and_keeps_the_newest() -> None:
     for _ in range(MAX_EVENTS + 50):
         record_events(w, cfg, [], [], [{"kind": "peace", "attacker": 0, "defender": 1}])
     assert len(w.events) == MAX_EVENTS
-    assert w.events[-1].id > w.events[0].id
+    assert [e.id for e in w.events] == list(range(50, MAX_EVENTS + 50))
