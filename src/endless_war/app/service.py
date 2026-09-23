@@ -67,9 +67,20 @@ class SimulationService:
     # -- public interface -------------------------------------------------
 
     def start(self) -> None:
-        """Spawn the simulation thread. Idempotent."""
+        """Spawn the simulation thread. Idempotent while a thread is alive.
+
+        Guards on liveness, not merely on `self._thread` being set, so this
+        agrees with `is_running()`. A thread that survived a timed-out
+        `stop()` and has since died on its own leaves a stale-but-not-None
+        reference behind; refusing to start over that reference forever
+        would make the service permanently unusable through its own public
+        interface. Refuse only while the existing thread is genuinely
+        alive; otherwise clear the stale reference and spawn a fresh one.
+        """
         if self._thread is not None:
-            return
+            if self._thread.is_alive():
+                return
+            self._thread = None
         self._stopping.clear()
         self._thread = threading.Thread(target=self._run, name=THREAD_NAME, daemon=True)
         self._thread.start()
@@ -120,6 +131,32 @@ class SimulationService:
         with self._view_lock:
             self._view = view
 
+    def _safe_publish(self) -> None:
+        """Publish a view; if publishing itself fails, fault instead of dying.
+
+        `_drain()` and `engine.tick()` each have an exception boundary that
+        turns a failure into a fault; `_publish()` did not, so a bug in
+        `build_view` would unwind `_run` and kill the thread with no faulted
+        view ever surfacing -- indistinguishable from a healthy-but-slow
+        simulation. If the first attempt raises, record the fault (unless one
+        is already recorded, so a publish failure never overwrites a more
+        informative tick/command fault) and try once more to publish that
+        faulted view. If even that second attempt raises -- publishing the
+        fault about publishing can fail too -- give up silently for this
+        cycle rather than let the exception escape: the thread must survive
+        and `is_running()` must stay truthful no matter what `build_view`
+        does.
+        """
+        try:
+            self._publish()
+        except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+            if self._fault_message is None:
+                self._fault_message = f"{type(exc).__name__}: {exc}"
+            try:
+                self._publish()
+            except Exception:  # noqa: BLE001 - already faulted; must not crash the thread
+                pass
+
     def _apply(self, command: Command) -> None:
         if isinstance(command, Pause):
             if self._speed != "paused":
@@ -151,7 +188,7 @@ class SimulationService:
 
     def _run(self) -> None:
         last_tick_at = self._monotonic()
-        self._publish()
+        self._safe_publish()
         while not self._stopping.is_set():
             try:
                 changed = self._drain()
@@ -193,6 +230,6 @@ class SimulationService:
                         break
 
             if due or changed:
-                self._publish()
+                self._safe_publish()
             self._sleep(self._poll_seconds)
-        self._publish()
+        self._safe_publish()

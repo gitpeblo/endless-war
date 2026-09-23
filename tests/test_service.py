@@ -291,3 +291,88 @@ def test_a_timed_out_stop_is_observable_and_blocks_a_second_thread() -> None:
         assert service.is_running() is False
     finally:
         service.stop()
+
+
+def test_start_recovers_after_a_stale_thread_dies_on_its_own() -> None:
+    cfg = load_config()
+    world = generate_world(seed=42, config=cfg)
+    clock = FakeClock()
+    # Same slow-sleep trick as the timed-out-stop test: force a stop() to
+    # time out and leave a stale-but-alive thread reference behind.
+    service = SimulationService(
+        world, cfg, monotonic=clock, sleep=lambda _s: time.sleep(0.2)
+    )
+    service.start()
+    try:
+        time.sleep(0.05)  # let the thread get into its slow sleep at least once
+
+        assert service.stop(timeout=0.02) is False
+        assert service.is_running() is True
+
+        # While the old thread is genuinely alive, start() must still
+        # refuse -- the same property test_a_timed_out_stop_is_observable_
+        # and_blocks_a_second_thread protects.
+        service.start()
+        assert (
+            len([t for t in threading.enumerate() if t.name == "endless-war-sim"]) == 1
+        ), "start() must refuse while the old thread is still alive"
+
+        # _stopping is already set from the stop() call above, so the old
+        # thread exits on its own the next time it wakes from its slow
+        # sleep -- neither stop() nor start() is called again to make that
+        # happen. Poll the real thread to death, bounded so a regression
+        # fails fast instead of hanging.
+        old_thread = service._thread  # noqa: SLF001 - poll the real thread directly
+        for _ in range(2000):
+            if not old_thread.is_alive():
+                break
+            time.sleep(0.001)
+        else:
+            raise AssertionError("old thread did not die on its own")
+
+        assert service.is_running() is False, "is_running() already agrees the thread is gone"
+
+        # start() must not refuse forever just because self._thread is a
+        # stale reference to a thread that has since died on its own --
+        # that would make the service unusable through its own interface.
+        service.start()
+        assert service.is_running() is True
+        sim_threads = [t for t in threading.enumerate() if t.name == "endless-war-sim"]
+        assert len(sim_threads) == 1, "start() after a stale dead thread must run exactly one thread"
+    finally:
+        service.stop()
+
+
+def test_a_failing_publish_surfaces_as_a_faulted_view_instead_of_a_silent_stall(
+    monkeypatch,
+) -> None:
+    from endless_war.app import service as service_module
+
+    real_build_view = service_module.build_view
+
+    def flaky_build_view(*args, **kwargs):
+        # Fails on every "normal" publish, but succeeds once the caller is
+        # already reporting a fault -- this is what lets _safe_publish's
+        # retry actually get a faulted view out, rather than modelling a
+        # bug that can never be surfaced at all.
+        if kwargs.get("fault_message") is None:
+            raise RuntimeError("publish exploded")
+        return real_build_view(*args, **kwargs)
+
+    monkeypatch.setattr(service_module, "build_view", flaky_build_view)
+
+    service, clock, _world = _service()
+    service.start()
+
+    def has_faulted() -> bool:
+        view = service.latest_view()
+        return view is not None and view.faulted
+
+    try:
+        assert _run_until(service, has_faulted, clock)
+        view = service.latest_view()
+        assert view.faulted is True
+        assert "publish exploded" in view.fault_message
+        assert service.is_running() is True, "a failing publish must not kill the thread"
+    finally:
+        service.stop()
