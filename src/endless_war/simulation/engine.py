@@ -10,6 +10,7 @@ import random
 from datetime import timedelta
 from typing import Any
 
+from endless_war.ai.strategic import choose_strategic_actions
 from endless_war.config import load_config
 from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.battle import resolve_battles
@@ -44,7 +45,7 @@ class SimulationEngine:
         update_economy(self.world, self.rng, self.config)
         update_recruitment(self.world, self.rng, self.config)
         update_supply(self.world, self.rng, self.config)
-        # AI decisions
+        choose_strategic_actions(self.world, self.rng, self.config)
         update_movement(self.world, self.rng, self.config)
         battle_records = resolve_battles(self.world, self.rng, self.config)
         capture_records = apply_control_changes(
