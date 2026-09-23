@@ -1,8 +1,10 @@
 """Army movement, supply draw, and recovery.
 
-An army advances at most one province per tick and cannot enter a province
-defended by a hostile army — that is a battle, resolved by the battle system
-before movement is retried on a later tick.
+An army advances at most one province per tick. Moving into a province held by
+a hostile faction IS the attack: the army enters, and the battle system — which
+runs later in the same tick — resolves the engagement there, with the province
+controller's armies as defenders. A broken attacker is pushed back out by the
+occupation system. See docs/decisions.md, 2026-09-23, "the contact rule".
 """
 
 from __future__ import annotations
@@ -52,8 +54,6 @@ def update_movement(world: WorldState, rng: random.Random, config: dict[str, Any
         if target_id not in here.neighbors:
             army.destination_id = None
             continue
-        if hostile_armies_in(world, target_id, army.faction_id):
-            continue  # blocked: the battle system resolves this
         if army.organization < 0.15:
             army.destination_id = None
             continue

@@ -31,22 +31,38 @@ def test_army_without_destination_stays_put() -> None:
     assert army.province_id == origin
 
 
-def test_move_into_hostile_province_is_blocked_until_battle_resolves() -> None:
+def test_move_into_hostile_province_is_the_attack() -> None:
+    """Advancing into a defended hostile province is how an attack begins.
+
+    docs/decisions.md (2026-09-23, contact rule): battle.py takes the province
+    controller's armies as defenders and the hostile armies standing in that
+    province as attackers, and control.py retreats broken *attackers* back out.
+    Neither is reachable unless movement lets the attacker in, so it must.
+
+    Fixture: at seed 42, faction 4 holds province 61 with army 14 and faction 3
+    holds the adjacent province 62 with army 10, both straight from worldgen --
+    no controller is forced, and (3, 4) is a real bordering pair.
+    """
     cfg = load_config()
     w = generate_world(seed=42, config=cfg)
-    army = w.armies[0]
-    target = w.provinces[army.province_id].neighbors[0]
-    enemy = (army.faction_id + 1) % len(w.factions)
-    w.factions[army.faction_id].at_war_with = {enemy}
-    w.factions[enemy].at_war_with = {army.faction_id}
-    w.provinces[target].controller_faction_id = enemy
-    defender = next(
-        a for a in w.armies.values() if a.faction_id == enemy
-    )
-    defender.province_id = target
-    army.destination_id = target
+    attacker, defender = w.armies[14], w.armies[10]
+    origin, target = 61, 62
+    assert attacker.province_id == origin and attacker.faction_id == 4
+    assert defender.province_id == target and defender.faction_id == 3
+    assert w.provinces[origin].controller_faction_id == 4
+    assert w.provinces[target].controller_faction_id == 3
+    assert target in w.provinces[origin].neighbors
+
+    w.factions[4].at_war_with = {3}
+    w.factions[3].at_war_with = {4}
+    attacker.destination_id = target
+
     update_movement(w, random.Random(1), cfg)
-    assert army.province_id != target, "cannot walk into a defended hostile province"
+
+    assert attacker.province_id == target, (
+        "an army ordered into a defended hostile province must enter it; "
+        "the battle system resolves the engagement later in the same tick"
+    )
 
 
 def test_armies_in_returns_only_that_province() -> None:
