@@ -32,6 +32,8 @@ def update_movement(world: WorldState, rng: random.Random, config: dict[str, Any
     """Draw supply, recover, then advance one province toward the destination."""
     org_recovery: float = config["balance"]["organization_recovery_per_tick"]
     morale_recovery: float = config["balance"]["morale_recovery_per_tick"]
+    min_advance_org: float = config["balance"]["min_advance_organization"]
+    low_supply: float = config["balance"]["low_supply_threshold"]
 
     for aid in sorted(world.armies):
         army = world.armies[aid]
@@ -51,12 +53,12 @@ def update_movement(world: WorldState, rng: random.Random, config: dict[str, Any
         advancing = (
             target_id is not None
             and target_id in here.neighbors
-            and army.organization >= 0.15
+            and army.organization >= min_advance_org
         )
 
-        if army.supply < 0.35:
-            army.organization = clamp(army.organization - (0.35 - army.supply) * 0.1)
-            army.morale = clamp(army.morale - (0.35 - army.supply) * 0.05)
+        if army.supply < low_supply:
+            army.organization = clamp(army.organization - (low_supply - army.supply) * 0.1)
+            army.morale = clamp(army.morale - (low_supply - army.supply) * 0.05)
         elif not advancing:
             army.organization = clamp(army.organization + org_recovery * army.supply)
             army.morale = clamp(army.morale + morale_recovery * army.supply)

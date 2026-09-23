@@ -5,6 +5,8 @@ from endless_war.domain.models import Army
 from endless_war.simulation.systems.battle import effective_power, resolve_battles
 from endless_war.simulation.worldgen import generate_world
 
+TERRAIN = load_config()["balance"]["terrain_defence"]
+
 
 def _two_army_standoff(cfg):
     """Put one army from faction 0 and one from faction 1 in the same province, at war."""
@@ -24,24 +26,24 @@ def _two_army_standoff(cfg):
 def test_effective_power_rises_with_manpower() -> None:
     cfg = load_config()
     w = _two_army_standoff(cfg)
-    weak = effective_power(w.armies[0], w, defending=False)
+    weak = effective_power(w.armies[0], w, False, TERRAIN)
     w.armies[0].manpower = 100_000
-    assert effective_power(w.armies[0], w, defending=False) > weak
+    assert effective_power(w.armies[0], w, False, TERRAIN) > weak
 
 
 def test_effective_power_is_zero_for_an_empty_army() -> None:
     cfg = load_config()
     w = _two_army_standoff(cfg)
     w.armies[0].manpower = 0
-    assert effective_power(w.armies[0], w, defending=False) == 0.0
+    assert effective_power(w.armies[0], w, False, TERRAIN) == 0.0
 
 
 def test_defender_gains_a_terrain_bonus() -> None:
     cfg = load_config()
     w = _two_army_standoff(cfg)
     w.provinces[w.armies[0].province_id].terrain = "mountain"
-    attacking = effective_power(w.armies[0], w, defending=False)
-    defending = effective_power(w.armies[0], w, defending=True)
+    attacking = effective_power(w.armies[0], w, False, TERRAIN)
+    defending = effective_power(w.armies[0], w, True, TERRAIN)
     assert defending > attacking
 
 

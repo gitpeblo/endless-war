@@ -12,10 +12,6 @@ from typing import Any
 
 from endless_war.domain.models import Army, WorldState
 
-BROKEN_ORGANIZATION = 0.30
-BROKEN_MORALE = 0.25
-
-
 def _hostile_neighbours(world: WorldState, army: Army) -> list[int]:
     at_war = world.factions[army.faction_id].at_war_with
     return [
@@ -60,11 +56,14 @@ def choose_strategic_actions(
     world: WorldState, rng: random.Random, config: dict[str, Any]
 ) -> None:
     """Set `destination_id` and `stance` for every army."""
+    broken_org: float = config["balance"]["broken_organization"]
+    broken_mor: float = config["balance"]["broken_morale"]
+    attack_ratio: float = config["balance"]["attack_strength_ratio"]
     for aid in sorted(world.armies):
         army = world.armies[aid]
         army.destination_id = None
 
-        broken = army.organization < BROKEN_ORGANIZATION or army.morale < BROKEN_MORALE
+        broken = army.organization < broken_org or army.morale < broken_mor
         friendly = _friendly_neighbours(world, army)
         if broken:
             army.stance = "withdrawal"
@@ -77,7 +76,7 @@ def choose_strategic_actions(
         if hostile:
             hostile.sort(key=lambda pid: (_defenders_in(world, pid, army.faction_id), pid))
             weakest = hostile[0]
-            if _defenders_in(world, weakest, army.faction_id) < army.manpower * 1.2:
+            if _defenders_in(world, weakest, army.faction_id) < army.manpower * attack_ratio:
                 army.stance = "aggressive"
                 army.destination_id = weakest
             else:

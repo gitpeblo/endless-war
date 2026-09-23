@@ -14,11 +14,20 @@ from typing import Any
 from endless_war.domain.models import Army, WorldState
 from endless_war.simulation.systems import clamp
 from endless_war.simulation.systems.movement import armies_in, hostile_armies_in
-from endless_war.simulation.worldgen import TERRAIN_DEFENCE
 
 
-def effective_power(army: Army, world: WorldState, defending: bool) -> float:
-    """Combat power from normalized factors. Zero for an army with no men."""
+def effective_power(
+    army: Army,
+    world: WorldState,
+    defending: bool,
+    terrain_defence: dict[str, float],
+) -> float:
+    """Combat power from normalized factors. Zero for an army with no men.
+
+    The quality coefficients below stay in code on purpose: they are the shape
+    of the model, not balance dials, and moving them to config would invite
+    tuning that silently changes what "power" means.
+    """
     if army.manpower <= 0:
         return 0.0
     province = world.provinces[army.province_id]
@@ -29,7 +38,7 @@ def effective_power(army: Army, world: WorldState, defending: bool) -> float:
         * (0.50 + 0.50 * clamp(army.training))
         * (0.40 + 0.60 * clamp(army.supply))
     )
-    terrain = TERRAIN_DEFENCE.get(province.terrain, 1.0) if defending else 1.0
+    terrain = terrain_defence.get(province.terrain, 1.0) if defending else 1.0
     return army.manpower * quality * terrain
 
 
@@ -53,6 +62,7 @@ def resolve_battles(
 ) -> list[dict[str, Any]]:
     """Resolve one tick of combat in every contested province."""
     base: float = config["balance"]["base_casualty_rate"]
+    terrain_defence: dict[str, float] = config["balance"]["terrain_defence"]
     attacker_break: float = config["balance"]["attacker_break_organization"]
     defender_break: float = config["balance"]["defender_break_organization"]
     records: list[dict[str, Any]] = []
@@ -69,8 +79,12 @@ def resolve_battles(
             continue
         attacker_faction = attackers[0].faction_id
 
-        att_power = sum(effective_power(a, world, defending=False) for a in attackers)
-        def_power = sum(effective_power(a, world, defending=True) for a in defenders)
+        att_power = sum(
+            effective_power(a, world, False, terrain_defence) for a in attackers
+        )
+        def_power = sum(
+            effective_power(d, world, True, terrain_defence) for d in defenders
+        )
         att_power *= rng.uniform(0.9, 1.1)
         def_power *= rng.uniform(0.9, 1.1)
         total = att_power + def_power

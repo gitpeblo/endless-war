@@ -11,7 +11,6 @@ from typing import Any
 from endless_war.domain.models import Event, WorldState
 
 MAX_EVENTS = 2000
-SIGNIFICANT_BATTLE_LOSSES = 5_000
 
 
 def _add(world: WorldState, category: str, severity: str, title: str,
@@ -38,6 +37,7 @@ def record_events(
     diplomacy_events: list[dict[str, Any]],
 ) -> None:
     """Turn this tick's system records into history."""
+    significant: int = config["balance"]["significant_battle_losses"]
     name = lambda fid: world.factions[fid].name if fid in world.factions else "unknown"  # noqa: E731
 
     for event in diplomacy_events:
@@ -60,7 +60,7 @@ def record_events(
 
     for battle in battle_records:
         total = battle["attacker_losses"] + battle["defender_losses"]
-        if total < SIGNIFICANT_BATTLE_LOSSES:
+        if total < significant:
             continue
         _add(world, "military", "major", "Major engagement",
              f"{total:,} casualties in {world.provinces[battle['province_id']].name} "

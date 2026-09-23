@@ -26,3 +26,21 @@ war_declaration_max_exhaustion = 0.45
 peace_exhaustion_threshold = 0.75
 peace_stalemate_ticks = 480
 min_supply = 0.05
+# Thresholds the AI and the systems read. Moved out of code so the next phase
+# can tune them without touching a system (CLAUDE.md: balancing numbers live here).
+broken_organization = 0.30
+broken_morale = 0.25
+attack_strength_ratio = 1.2
+min_advance_organization = 0.15
+low_supply_threshold = 0.35
+significant_battle_losses = 2000
+
+# Defensive multiplier applied to the defender's power, by terrain.
+# Keep this table LAST in [balance]: TOML assigns any key after a sub-table
+# header to that sub-table.
+[balance.terrain_defence]
+plains = 1.00
+forest = 1.20
+hills = 1.35
+mountain = 1.60
+urban = 1.45

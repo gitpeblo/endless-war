@@ -12,7 +12,22 @@ from typing import Any
 from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.movement import armies_in
 
-OCCUPIED_SUPPLY_PENALTY = 0.5
+
+def _retreat(world: WorldState, province_id: int, faction_id: int) -> None:
+    """Pull `faction_id`'s armies out of `province_id` to an adjacent friendly province.
+
+    A force with nowhere friendly to fall back to stands where it is.
+    """
+    friendly = [
+        nid for nid in world.provinces[province_id].neighbors
+        if world.provinces[nid].controller_faction_id == faction_id
+    ]
+    if not friendly:
+        return
+    for army in armies_in(world, province_id):
+        if army.faction_id == faction_id:
+            army.province_id = friendly[0]
+            army.destination_id = None
 
 
 def apply_control_changes(
@@ -25,19 +40,15 @@ def apply_control_changes(
     captures: list[dict[str, Any]] = []
 
     for record in battle_records:
-        if not record["attacker_broke"]:
-            continue
-        province_id = record["province_id"]
-        for army in armies_in(world, province_id):
-            if army.faction_id != record["attacker_faction"]:
-                continue
-            friendly = [
-                n for n in world.provinces[province_id].neighbors
-                if world.provinces[n].controller_faction_id == army.faction_id
-            ]
-            if friendly:
-                army.province_id = friendly[0]
-                army.destination_id = None
+        # Only a broken ATTACKER retreats. `record["defender_broke"]` is computed
+        # by the battle system and deliberately read by nobody: wiring it up was
+        # measured over three ten-year runs and made the map markedly more static
+        # (seed 99 fell from 9 of 9 year-over-year changes to 2), because
+        # surviving garrisons lock the front. `defender_break_organization` is
+        # therefore dead config for now. See docs/decisions.md, 2026-09-23,
+        # "defender retreat: measured and reverted" before re-attempting it.
+        if record["attacker_broke"]:
+            _retreat(world, record["province_id"], record["attacker_faction"])
 
     for pid in sorted(world.provinces):
         province = world.provinces[pid]
@@ -57,7 +68,6 @@ def apply_control_changes(
             {"province_id": pid, "from_faction": current, "to_faction": occupier}
         )
         province.controller_faction_id = occupier
-        province.supply_value *= OCCUPIED_SUPPLY_PENALTY
 
     for aid in [aid for aid in sorted(world.armies) if world.armies[aid].manpower <= 0]:
         del world.armies[aid]

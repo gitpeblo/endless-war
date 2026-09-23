@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from endless_war.config import load_config
 from endless_war.domain.models import WorldState
-from endless_war.simulation.worldgen import TERRAIN_DEFENCE, generate_province_grid
+from endless_war.simulation.worldgen import generate_province_grid
 
 
 def _world() -> WorldState:
@@ -47,7 +47,7 @@ def test_terrain_is_known_and_population_positive() -> None:
     w = _world()
     generate_province_grid(w, random.Random(42), load_config())
     for prov in w.provinces.values():
-        assert prov.terrain in TERRAIN_DEFENCE
+        assert prov.terrain in load_config()["balance"]["terrain_defence"]
         assert prov.population > 0
         assert 0.0 <= prov.infrastructure <= 1.0
 

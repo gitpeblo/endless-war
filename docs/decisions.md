@@ -99,16 +99,32 @@ ten-year observation run (`python -m endless_war --years 10 --seed 42`):
 - **No manpower demobilisation or treasury sink in this branch.**
   `specs/03-mvp.md` defers that depth and the checkpoint is met without it.
   **Consequence, stated plainly so nobody tunes it blind:
-  `peace_exhaustion_threshold` (0.75) is currently DEAD CONFIG.** Exhaustion
-  never exceeds 0.08 in ten years and every war ends on `peace_stalemate_ticks`
-  instead. The cause is not the multiplier: exhaustion accrues as
-  `new_casualties / (faction manpower + army strength)`, and that denominator
-  grows from 1.79M to 6.92M across a decade because recruitment fills the
-  national pool while nothing moves men from the pool into armies (army share of
-  manpower falls 0.48 -> 0.07). Reaching the threshold would need roughly a 25x
+  `peace_exhaustion_threshold` (0.75) is currently DEAD CONFIG.** Measured peak
+  exhaustion for any faction across the whole decade is **0.0434** -- about 6% of
+  the threshold -- and every war ends on `peace_stalemate_ticks` instead. The
+  cause is not the multiplier: exhaustion accrues as
+  `new_casualties / (that faction's manpower + that faction's army strength)`,
+  and that **per-faction** denominator grows several-fold over the decade because
+  recruitment fills the national pool while nothing moves men from the pool into
+  armies. Measured per faction, start -> end: f0 446,963 -> 759,171;
+  f1 356,004 -> 1,583,066; f2 350,055 -> 1,312,501; f3 429,841 -> 1,946,696;
+  f4 211,862 -> 1,315,209. (Across the world the pool alone runs 1.79M -> 6.92M
+  and the army share of manpower falls 0.48 -> 0.07, but that world total is not
+  what the formula divides by.) Reaching the threshold would need roughly a 25x
   bump to `exhaustion_per_casualty_fraction`, which would be tuning around the
   missing reinforcement mechanic. **Fix demobilisation/reinforcement first; do
   not raise the multiplier.**
+
+  **The same phantom pool distorts Task 9's war declarations, which is a
+  second and more visible consequence than the exhaustion denominator.**
+  `diplomacy.py` scores strength as army manpower + pool x 0.5, so a faction
+  that has lost its territory still reads as strong: faction 3's pool freezes at
+  **1,855,937** and it keeps declaring wars on that basis. War 12 is a
+  27-province faction declaring on a 33-province one purely on pool strength,
+  and wars 18, 22, 23 and 25 all target a **one-province** faction. `_strength`
+  is deliberately NOT being changed here -- that is next-phase work -- but a
+  future session must know that the pool decides *which wars happen*, not just
+  how slowly exhaustion accrues.
 
 **Reason:**
 - A raw ratio (`att_power / def_power`) is unbounded: a ten-to-one advantage
@@ -325,3 +341,60 @@ tables and was wrong; the programmatic count is **6 of 9 year-over-year
 transitions**. The round 2 addendum has been corrected in place — this note
 records only that the figure was retracted, so nobody reintroduces it from an
 older copy. The round 2 verdict is unaffected.
+
+### Final fix wave addendum (same day) — review findings
+
+**Defender retreat: measured and reverted.** `defender_broke` is computed by
+`resolve_battles` and read by nobody; only `attacker_broke` drives a retreat.
+Measured over the decade at seed 42, **defender_broke fires on 26 of 60
+battle-ticks against attacker_broke's 3**, so `defender_break_organization`
+(0.20) is dead config and a beaten garrison fights to annihilation. Wiring a
+symmetric retreat was implemented with two regression tests and measured on
+three seeds against the current baseline:
+
+| Seed | Metric | Now | With defender retreat |
+| --- | --- | --- | --- |
+| 42 | battles / capture-years / map changes | 60 / 8 / 6 of 9 | 94 / 6 / 5 of 9 |
+| 7 | battles / capture-years / map changes | 146 / 7 / 5 of 9 | 130 / 6 / 5 of 9 |
+| 99 | battles / capture-years / map changes | 235 / 10 / **9 of 9** | 277 / 3 / **2 of 9** |
+
+It was reverted for failing its gate on "the map still changing". **The reason is
+worth keeping:** a defender that retreats *survives*, so more armies remain alive
+to garrison more provinces, and the front locks. Captures fall (620 → 480 at seed
+42, 993 → 317 at seed 99) precisely because capture-churn is walking into *empty*
+ground, and there is now less empty ground. Defender retreat therefore cures the
+churn pathology by overshooting into stasis. A future session should expect to
+re-apply it **together with** quality-based defender scoring (the other reverted
+change, which makes armies more willing to attack a weak garrison); the two pull
+in opposite directions and may only work as a pair.
+
+**Battle events were unreachable; the threshold is now config.**
+`SIGNIFICANT_BATTLE_LOSSES = 5_000` was a single-tick figure, but `resolve_battles`
+bounds combined per-tick losses at `2 x base_casualty_rate` of engaged manpower.
+Measured maximum single-tick total over three decades: **2,978 / 3,687 / 3,404** —
+the threshold could never be met, so ten years logged **zero** military events
+while 103,468 men died. It is now `balance.significant_battle_losses = 2000`,
+chosen from the measured distribution: 2,000 sits at or above the 75th percentile
+on all three seeds and yields 18 / 16 / 28 military events per decade against 620
+territory events — a readable tail rather than a flood or silence. (1,500 was
+suggested but logs 50% of all engagements at seed 42, which is not "significant".)
+
+**`OCCUPIED_SUPPLY_PENALTY` deleted as a no-op.** `apply_control_changes`
+multiplied `supply_value` by 0.5 on capture, but `update_supply` resets every
+province to the floor at the top of the next tick and nothing reads it in
+between. Confirmed empirically: removing it leaves all three decade runs
+**byte-identical** on every measured figure. No durable occupation mechanic was
+invented to justify it — that is next-phase design.
+
+**Balance constants moved to `[balance]`, values unchanged:** `terrain_defence`
+(as a sub-table), `broken_organization`, `broken_morale`, `attack_strength_ratio`,
+`min_advance_organization`, `low_supply_threshold` and
+`significant_battle_losses`. Proven value-preserving: after the move the decade
+is identical to baseline on battles, captures, capture-years, casualties, map
+changes, max provinces, break counts and invariants across all three seeds — the
+only difference is the military-event count, which is the threshold change above.
+**Deliberately left in code:** the `effective_power` quality coefficients and
+`_TERRAIN_WEIGHTS`, because they are the shape of the model rather than balance
+dials — tuning them would silently change what "power" and "map" mean.
+`effective_power` now takes the terrain table as a parameter rather than
+importing a module constant.

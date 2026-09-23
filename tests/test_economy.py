@@ -29,7 +29,12 @@ def test_recruitment_converges_to_mobilization_ceiling() -> None:
     for _ in range(4000):
         update_recruitment(w, random.Random(1), cfg)
     for fid, fac in w.factions.items():
-        population = sum(p.population for p in w.provinces.values() if p.owner_faction_id == fid)
+        # `update_recruitment` derives the ceiling from CONTROLLED population,
+        # so the fixture must too. They coincide at generation and diverge the
+        # moment anything is occupied -- this repo's recurring fixture defect.
+        population = sum(
+            p.population for p in w.provinces.values() if p.controller_faction_id == fid
+        )
         cap = population * cfg["balance"]["mobilization_ceiling"]
         assert fac.manpower <= cap + 1, "manpower must never exceed the mobilization ceiling"
         assert fac.manpower > cap * 0.5, "manpower should approach the ceiling over time"

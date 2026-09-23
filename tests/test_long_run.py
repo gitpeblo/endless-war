@@ -1,7 +1,8 @@
 """The CONTINUE_OFFLINE.md checkpoint, as an automated test.
 
-SLOW: the ten-year fixture runs 14 600 ticks and takes minutes, not seconds.
-Skip it during tight loops with `-m "not slow"`.
+SLOW relative to the unit tests: the ten-year fixture runs 14 600 ticks.
+Measured at about 6 seconds, so it is worth running -- skip it during tight
+loops with `-m "not slow"`, but do not avoid it before committing.
 """
 
 import pytest
@@ -16,8 +17,10 @@ from endless_war.simulation.worldgen import generate_world
 TICKS_PER_YEAR = 4 * 365
 
 # Captures must land in at least this many distinct simulated years of the ten.
-# Observed behaviour at seed 42 is six, so this leaves real headroom; raise it
-# only with a measurement showing the extra years are reliably there.
+# Observed behaviour at seed 42 is EIGHT of the ten simulated years, so this
+# leaves real headroom. (Do not confuse it with the six years that contain a
+# battle: captures include bloodless walk-ins into undefended provinces.)
+# Raise it only with a measurement showing the extra years are reliably there.
 MIN_YEARS_WITH_CAPTURES = 3
 
 

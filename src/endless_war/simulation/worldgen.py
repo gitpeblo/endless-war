@@ -14,15 +14,9 @@ from typing import Any
 
 from endless_war.domain.models import Faction, Province, WorldState
 
-# Defensive multiplier applied to the defender's power in battle.
-TERRAIN_DEFENCE: dict[str, float] = {
-    "plains": 1.00,
-    "forest": 1.20,
-    "hills": 1.35,
-    "mountain": 1.60,
-    "urban": 1.45,
-}
-
+# The defensive multipliers now live in config/default.toml [balance.terrain_defence].
+# The generation weights below stay in code: they set the shape of the map, not its
+# balance, and worldgen must stay reproducible from the seed alone.
 _TERRAIN_WEIGHTS: list[tuple[str, int]] = [
     ("plains", 40), ("forest", 22), ("hills", 18), ("mountain", 10), ("urban", 10),
 ]
