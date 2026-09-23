@@ -19,7 +19,6 @@ RECENT_EVENT_LIMIT = 12
 def _province_cells(
     world: WorldState, low_supply_threshold: float
 ) -> tuple[ProvinceCell, ...]:
-    occupied: dict[int, bool] = {}
     armies_here: dict[int, bool] = {}
     for aid in sorted(world.armies):
         armies_here[world.armies[aid].province_id] = True
@@ -31,7 +30,6 @@ def _province_cells(
         contested = controller != province.owner_faction_id
         if not contested and controller is not None:
             contested = bool(hostile_armies_in(world, pid, controller))
-        occupied[pid] = contested
         color = (
             world.factions[controller].color_key
             if controller in world.factions
