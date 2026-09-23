@@ -19,6 +19,12 @@ It prints one block per simulated year: each faction's provinces, population, ca
 
 The same seed always produces the same history, so runs are directly comparable.
 
+## How it works
+
+`docs/game-logic.md` describes what the simulation computes each tick — economy,
+supply, the army AI, battle resolution, and how wars start and end — with the
+actual formulas and the config values that tune them.
+
 ## Core experience
 
 - Runs continuously in the background.

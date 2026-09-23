@@ -1,5 +1,9 @@
 # Simulation Notes
 
+> **These are design intentions, written before the systems existed.** For what
+> the code actually computes — the real formulas, the config keys that tune them,
+> and the known gaps — see `game-logic.md`.
+
 ## Combat philosophy
 Combat should create plausible strategic movement, not tactical realism.
 
