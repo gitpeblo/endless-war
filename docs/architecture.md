@@ -9,8 +9,20 @@ The application should be divided into:
 2. **Simulation systems** — deterministic state transitions.
 3. **AI systems** — generate strategic decisions.
 4. **Persistence** — SQLite and save metadata.
-5. **Application services** — simulation loop, catch-up, commands.
+5. **Application services** — background simulation thread, live clock, command queue, and immutable view snapshots.
 6. **UI** — GTK views and tray integration.
+
+## Application services layer
+
+`src/endless_war/app/` owns the `SimulationService`: a daemon thread that advances the engine on a live wall-clock schedule, publishes immutable `WorldView` snapshots to a lock-protected reader, and accepts commands (pause, resume, speed change, faction binding, shutdown) that are applied only at tick boundaries — never during world state mutation. Commands applied at tick boundaries preserves determinism: a paused, resumed, or sped-up run reproduces byte-for-byte the same history as a straight-through run of equivalent length and seed.
+
+The frozen view model (`WorldView`, `ProvinceCell`, `FactionRow`, `EventLine`) is built fresh from world state after every tick. A consumer sees a plain-value snapshot, never a live simulation object, so the GTK thread may read a view while the simulation thread mutates state, without a lock and without risk of a UI handler reaching back into the world.
+
+Speeds are `paused`, `1x` (from `config/default.toml`'s `live_tick_seconds`), `4x`, and `16x`. Catch-up when the service wakes from a stall is capped at `max_catchup_ticks_per_wake`; this prevents the world from simulating a week at once on a laptop wake.
+
+A tick that raises, or a command that fails to apply, sets a fault message and publishes a view flagged as faulted; a faulted service stops ticking and cannot recover within the process lifetime. Offline catch-up across restarts is not provided by this layer — it requires knowledge of when the process last stopped, which is a persistence-layer responsibility.
+
+**Import rule:** `app/` imports `simulation` and `domain`; nothing in `domain/`, `simulation/`, or `ai/` imports `app/`.
 
 ## Suggested tick pipeline
 

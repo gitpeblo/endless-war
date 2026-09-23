@@ -398,3 +398,26 @@ only difference is the military-event count, which is the threshold change above
 dials — tuning them would silently change what "power" and "map" mean.
 `effective_power` now takes the terrain table as a parameter rather than
 importing a module constant.
+
+## 2026-09-23 — Application service layer: background thread, command queueing, and frozen views
+
+**Decision:**
+The application service layer (`src/endless_war/app/`) publishes immutable `WorldView` snapshots instead of allowing direct read access to mutable `WorldState`. Commands submitted to the service are queued and applied only at tick boundaries, never while the engine is mutating state. Four discrete speeds control the wall-clock rate: `paused`, `1x` (from config), `4x`, and `16x`. Catch-up after a sleep or stall is capped per wake to prevent the world from simulating a week at once.
+
+**Reason:**
+- Frozen views allow GTK and other consumers to read the world without locks. A copy happens once per tick, not on every view access, and the copy contains no mutable object shared with the live simulation state — the GTK thread cannot accidentally hold a reference to a live `Faction` and see it mutate mid-read.
+- Commands applied only at tick boundaries preserves determinism: a paused, resumed, or sped-up run produces byte-identical history to a straight-through run of the same length and seed. If commands touched state during a tick, the same tick would have different effects depending on when a command arrived, breaking reproducibility.
+- Discrete speeds (rather than arbitrary multipliers) are easier to understand and cheaper to schedule — the scheduler has only four branches rather than computing a divisor for every interval.
+- The catch-up cap prevents the world from falling catastrophically behind wall-clock time. A ten-second stall at 1× speed would normally earn 10 ticks of catch-up; without a cap, a one-minute stall would simulate a day in one go, and a night's sleep would force a month-long sprint. Capping at 8 ticks (48 simulated hours) keeps the catch-up burst brief while letting a brief stall recover.
+
+**Alternatives considered:**
+- *Deep-copy `WorldState` into the view.* This is simple but expensive: every tick copies tens of thousands of objects, and a frequent reader (e.g., a UI that redraws every 100ms) would copy far more than necessary.
+- *Share state under a read-write lock.* This adds latency to every tick (lock contention) and complexity (deadlock risk, unfair scheduling). A copy-once model is simpler and lighter.
+- *Arbitrary speed multipliers.* A consumer submits `SetSpeed(2.5)` for a custom speed. This requires dynamic arithmetic on every interval calculation and is harder to test exhaustively; discrete speeds are easier to verify.
+- *No catch-up cap, or a per-tick cap.* Unlimited catch-up can force the simulation to sprint for minutes after a stall. A tiny per-tick cap (e.g., 1) means a brief stall never recovers. The 8-tick compromise is measured from expected use: a reader stalled for 48 simulated hours (6 wall-seconds) is routine; a sprint longer than that should not happen silently.
+
+**Consequences:**
+- Commands are queued and idempotent to their own domain (pause, resume, speed, faction binding, shutdown). A command submitted while a tick is in progress is applied at the next tick boundary, not discarded; a command submitted while paused is applied immediately at the next tick.
+- A tick that raises an exception sets a fault message and publishes a faulted view. The service stops ticking thereafter. There is currently no mechanism to clear a fault — a faulted service must be stopped and restarted (a process-level action). This is acceptable for the headless observatory and will be addressed by persistence (which knows how to load from a checkpoint, implicitly skipping the fault).
+- Offline catch-up across process restarts is **not** provided by the application layer. It requires knowledge of when the process last stopped, which only persistence (with a save file and its modification time, or a boot log) can provide. The headless core handles a restart as a new game — see `max_offline_days_per_startup` in config.
+- The simulation thread is single-threaded and single-instance per `SimulationService`. Starting a service twice on the same world state will deadlock or corrupt state; this is by design, not a limitation — one world, one thread.

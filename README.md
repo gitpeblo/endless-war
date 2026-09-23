@@ -20,6 +20,8 @@ Each yearly block lists, per faction, the provinces it controls, the population 
 
 **Runs are deterministic**: the same seed always produces the same history, so two runs are directly comparable and every figure recorded in `docs/decisions.md` can be reproduced by re-running its seed.
 
+The simulation also runs on a live wall-clock in a background thread via `endless_war.app.SimulationService`, which accepts pause, resume, speed, and faction-binding commands. This is what the future GTK shell will consume. There is still no graphical interface, and `run_cli.sh` remains the way to observe and verify a run.
+
 ### Tests
 
 ```bash
