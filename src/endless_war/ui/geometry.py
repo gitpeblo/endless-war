@@ -41,11 +41,14 @@ def cell_for(
     row, col = divmod(province_id, columns)
     cell_w = width / columns
     cell_h = height / rows
+    # Scale padding down if the cell cannot carry it, keeping the cell centred so
+    # that its centre point still resolves back to this province_id via province_at.
+    effective_padding = min(padding, cell_w / 4, cell_h / 4)
     return Cell(
-        x=col * cell_w + padding,
-        y=row * cell_h + padding,
-        width=max(0.0, cell_w - 2 * padding),
-        height=max(0.0, cell_h - 2 * padding),
+        x=col * cell_w + effective_padding,
+        y=row * cell_h + effective_padding,
+        width=max(0.0, cell_w - 2 * effective_padding),
+        height=max(0.0, cell_h - 2 * effective_padding),
     )
 
 

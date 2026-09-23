@@ -66,3 +66,38 @@ def test_a_point_outside_the_widget_hits_nothing() -> None:
     assert province_at(10.0, -1.0, 96, 12, 600.0, 400.0) is None
     assert province_at(601.0, 10.0, 96, 12, 600.0, 400.0) is None
     assert province_at(10.0, 401.0, 96, 12, 600.0, 400.0) is None
+
+
+def test_round_trip_at_small_and_irregular_widget_sizes() -> None:
+    """Padding must scale adaptively so round-trip holds even at degenerate sizes."""
+    # Test sizes where fixed padding would break the invariant
+    for province_count, cols in [(96, 12), (72, 8)]:
+        for width, height in (
+            (10.0, 8.0),      # Very small
+            (24.0, 16.0),     # Small
+            (1.0, 1.0),       # Degenerate
+            (313.0, 197.0),   # Uneven division (from existing test)
+        ):
+            for pid in range(province_count):
+                cell = cell_for(pid, province_count, cols, width, height)
+                hit = province_at(
+                    cell.x + cell.width / 2, cell.y + cell.height / 2,
+                    province_count, cols, width, height
+                )
+                assert hit == pid, (
+                    f"pid {pid} at {width}x{height} ({province_count} provinces, {cols} cols): "
+                    f"cell {cell}, centre ({cell.x + cell.width / 2}, "
+                    f"{cell.y + cell.height / 2}) resolved to {hit}"
+                )
+
+
+def test_tiling_holds_at_small_sizes() -> None:
+    """Cells must stay inside widget and not overlap, even when padded at small sizes."""
+    for width, height in ((10.0, 8.0), (24.0, 16.0), (1.0, 1.0)):
+        cells = [cell_for(pid, 96, 12, width, height) for pid in range(96)]
+        # All cells inside widget
+        assert all(0.0 <= c.x and 0.0 <= c.y for c in cells), f"Cell outside at {width}x{height}"
+        assert all(c.x + c.width <= width + 1e-9 for c in cells), f"Cell exceeds width at {width}x{height}"
+        assert all(c.y + c.height <= height + 1e-9 for c in cells), f"Cell exceeds height at {width}x{height}"
+        # Cells don't have negative extent
+        assert all(c.width >= 0.0 and c.height >= 0.0 for c in cells), f"Negative extent at {width}x{height}"
