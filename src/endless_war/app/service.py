@@ -13,7 +13,7 @@ import threading
 import time
 from typing import Any, Callable
 
-from endless_war.app.clock import SPEEDS, ticks_due
+from endless_war.app.clock import SPEEDS, seconds_per_tick, ticks_due
 from endless_war.app.commands import (
     BindFaction,
     Command,
@@ -74,12 +74,26 @@ class SimulationService:
         self._thread = threading.Thread(target=self._run, name=THREAD_NAME, daemon=True)
         self._thread.start()
 
-    def stop(self, timeout: float = 2.0) -> None:
-        """Ask the thread to finish and wait for it. Idempotent."""
+    def stop(self, timeout: float = 2.0) -> bool:
+        """Ask the thread to finish and wait for it. Idempotent.
+
+        Returns True once the thread has actually stopped, False if `timeout`
+        elapsed while it was still alive. On a timeout, `self._thread` is left
+        in place rather than cleared: `is_running()` must keep reporting that
+        the thread is alive, and `start()`'s "already running" guard must keep
+        refusing to spawn a second thread on top of a first one that never
+        actually died -- two threads calling `engine.tick()` on one WorldState
+        is exactly what this service exists to prevent.
+        """
         self._stopping.set()
-        thread, self._thread = self._thread, None
-        if thread is not None:
-            thread.join(timeout=timeout)
+        thread = self._thread
+        if thread is None:
+            return True
+        thread.join(timeout=timeout)
+        if thread.is_alive():
+            return False
+        self._thread = None
+        return True
 
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
@@ -147,16 +161,30 @@ class SimulationService:
             if self._stopping.is_set():
                 break
 
+            now = self._monotonic()
             due = 0
             if self._fault_message is None:
-                due = ticks_due(
-                    self._monotonic() - last_tick_at,
-                    self._speed,
-                    self._live_tick_seconds,
-                    self._max_catchup,
-                )
+                interval = seconds_per_tick(self._speed, self._live_tick_seconds)
+                if interval is None:
+                    # Paused: nothing is owed, and nothing may accrue while
+                    # paused either -- refresh the reference point every
+                    # iteration so a long pause never banks a catch-up burst.
+                    last_tick_at = now
+                else:
+                    due = ticks_due(
+                        now - last_tick_at, self._speed, self._live_tick_seconds, self._max_catchup
+                    )
+                    if due >= self._max_catchup:
+                        # The cap was hit: this is what it is for. Discard the
+                        # backlog rather than let the world drift further and
+                        # further behind wall clock.
+                        last_tick_at = now
+                    elif due:
+                        # Advance by exactly what was consumed, preserving the
+                        # sub-interval remainder instead of re-reading the
+                        # clock (which would silently drop it every tick).
+                        last_tick_at += due * interval
             if due:
-                last_tick_at = self._monotonic()
                 for _ in range(due):
                     try:
                         self._engine.tick()
