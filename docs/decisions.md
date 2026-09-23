@@ -233,13 +233,15 @@ years, round 1 → round 2:
 | Captures | 178 | 620 |
 | Wars declared / ended | 43 / 39 | 26 / 24 |
 | Events | 262 | 670 |
-| Years the map changed | 1 | 9 |
+| Year-over-year transitions in which the map changed | 1 of 9 | 6 of 9 |
 | Invariant violations | 0 | 0 |
 
-Territory now swings for nine of ten years: Free Cities 15 → 33 → 3, Astaran
-27 → 44 → 30, Korsk 15 → 40 → 28, Meridian 22 → 34, Valdran 17 → 1. Wars start,
-fronts move, wars end, nothing explodes — `CONTINUE_OFFLINE.md`'s criteria are
-satisfied, with the caveat below.
+Territory swings through the middle of the decade: Free Cities 15 → 33 → 3,
+Astaran 27 → 44 → 30, Korsk 15 → 40 → 28, Meridian 22 → 34, Valdran 17 → 1. Of
+the nine year-over-year transitions, six change the map; years 6, 7 and 10 repeat
+their predecessor, which is the wind-down described at the end of this addendum.
+Wars start, fronts move, wars end, nothing explodes — `CONTINUE_OFFLINE.md`'s
+criteria are satisfied, with the caveat below.
 
 **Neighbour-only war declaration was ruled conditionally and is NOT needed.**
 Instrumenting all 26 declarations shows **0 were between factions that did not
@@ -317,7 +319,9 @@ it. A future session should fix churn (an undefended province should not be
 able to change hands every other tick) and re-apply defender scoring together
 with it.
 
-**Correction to the round 2 addendum:** it stated the map changed in "9 of 10
-years" at seed 42. That was eyeballed from the printed tables and is wrong; the
-programmatic count is **6 of 9 year-over-year transitions**. The round 2 verdict
-is unaffected, but the number should not be quoted.
+**Correction already applied above:** the round 2 addendum originally claimed the
+map changed in "9 of 10 years" at seed 42. That was eyeballed from the printed
+tables and was wrong; the programmatic count is **6 of 9 year-over-year
+transitions**. The round 2 addendum has been corrected in place — this note
+records only that the figure was retracted, so nobody reintroduces it from an
+older copy. The round 2 verdict is unaffected.
