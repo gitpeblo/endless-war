@@ -10,3 +10,6 @@ venv/
 
 # subagent-driven-development scratch workspace
 .superpowers/
+
+# editable install metadata
+*.egg-info/
