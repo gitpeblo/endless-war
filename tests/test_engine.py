@@ -79,5 +79,9 @@ def test_broken_army_in_safe_territory_recovers() -> None:
         world.provinces[n].controller_faction_id == 0
         for n in world.provinces[13].neighbors
     ), "fixture: the front was supposed to stay far away during the test"
+    assert world.provinces[13].supply_value >= 0.35, (
+        "fixture: province 13 must stay above the low-supply threshold, or the army "
+        "would be taking the attrition branch instead of the recovery branch"
+    )
     assert army.province_id == 13, "a safe broken army should hold, not wander"
     assert army.organization > 0.20, "a safe broken army must recover organization"
