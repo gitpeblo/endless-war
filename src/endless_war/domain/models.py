@@ -3,6 +3,7 @@
 Keep these objects independent from GTK and persistence implementation details.
 """
 
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -64,6 +65,17 @@ class War:
 
 
 @dataclass(slots=True)
+class Event:
+    id: int
+    simulated_at: datetime
+    category: str
+    severity: str
+    title: str
+    body: str
+    related_entity_ids: list[int] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class WorldState:
     seed: int
     current_time: datetime
@@ -74,3 +86,5 @@ class WorldState:
     armies: dict[int, Army] = field(default_factory=dict)
     wars: dict[int, War] = field(default_factory=dict)
     next_war_id: int = 0
+    events: deque[Event] = field(default_factory=deque)
+    next_event_id: int = 0

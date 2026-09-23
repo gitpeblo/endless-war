@@ -21,6 +21,7 @@ from endless_war.simulation.systems.diplomacy import (
     update_exhaustion,
 )
 from endless_war.simulation.systems.economy import update_economy, update_recruitment
+from endless_war.simulation.systems.events import record_events
 from endless_war.simulation.systems.movement import update_movement
 from endless_war.simulation.systems.supply import update_supply
 
@@ -54,7 +55,9 @@ class SimulationEngine:
         update_exhaustion(self.world, self.rng, self.config)
         note_captures(self.world, capture_records)
         diplomacy_events = update_diplomacy(self.world, self.rng, self.config)
-        # events
+        record_events(
+            self.world, self.config, battle_records, capture_records, diplomacy_events
+        )
         # --- SYSTEM PIPELINE END ---
 
     def run(self, ticks: int) -> None:
