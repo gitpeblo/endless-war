@@ -35,7 +35,18 @@ def _faction_block(view: WorldView, faction_id: int) -> list[tuple[str, str]]:
 def status_rows(view: WorldView) -> list[tuple[str, str]]:
     """Label/value pairs for the side panel."""
     if view.bound_faction_id is not None:
-        return _faction_block(view, view.bound_faction_id)
+        # Check if the bound faction exists in the view
+        faction = next((f for f in view.factions if f.id == view.bound_faction_id), None)
+        if faction is not None:
+            return _faction_block(view, view.bound_faction_id)
+        # Bound faction not found: show indicator and fall back to world view
+        rows: list[tuple[str, str]] = [
+            (f"unknown faction {view.bound_faction_id}", "showing world")
+        ]
+        for faction in view.factions:
+            rows.append((faction.name, f"{faction.provinces} prov · {faction.population:,}"))
+        rows.append(("wars", f"{view.active_wars} active / {view.total_wars} total"))
+        return rows
     rows: list[tuple[str, str]] = [("World", "")]
     for faction in view.factions:
         rows.append((faction.name, f"{faction.provinces} prov · {faction.population:,}"))
@@ -55,10 +66,16 @@ def tray_summary(view: WorldView) -> str:
     """A single line for the tray menu header."""
     date = view.simulated_at.date().isoformat()
     if view.bound_faction_id is not None:
-        faction = next(f for f in view.factions if f.id == view.bound_faction_id)
+        faction = next((f for f in view.factions if f.id == view.bound_faction_id), None)
+        if faction is not None:
+            return (
+                f"{date} · {faction.name} · {faction.provinces} prov · "
+                f"{view.active_wars} wars · {view.speed}"
+            )
+        # Unknown faction: show indicator and world summary
         return (
-            f"{date} · {faction.name} · {faction.provinces} prov · "
-            f"{view.active_wars} wars · {view.speed}"
+            f"{date} · unknown faction {view.bound_faction_id} · "
+            f"{len(view.factions)} factions · {view.active_wars} wars · {view.speed}"
         )
     return (
         f"{date} · {len(view.factions)} factions · "

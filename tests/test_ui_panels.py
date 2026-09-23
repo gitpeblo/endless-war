@@ -74,3 +74,22 @@ def test_the_unbound_tray_summary_describes_the_world() -> None:
     summary = tray_summary(_view(ticks=100))
     assert "\n" not in summary
     assert "factions" in summary.lower() or "wars" in summary.lower()
+
+
+def test_status_rows_with_unknown_bound_faction_shows_unknown_and_world() -> None:
+    view = _view(bound=999)
+    rows = status_rows(view)
+    joined = " ".join(label + value for label, value in rows)
+    assert "999" in joined, "unknown faction id must be visible"
+    assert "unknown" in joined.lower(), "must be marked as unknown"
+    for faction in view.factions:
+        assert faction.name in joined, "world factions still shown"
+
+
+def test_tray_summary_with_unknown_bound_faction_shows_unknown_and_world() -> None:
+    view = _view(bound=999, ticks=100)
+    summary = tray_summary(view)
+    assert "\n" not in summary, "must remain single line"
+    assert "999" in summary, "unknown faction id must be visible"
+    assert "unknown" in summary.lower(), "must be marked as unknown"
+    assert "factions" in summary.lower() or "wars" in summary.lower(), "world info present"
