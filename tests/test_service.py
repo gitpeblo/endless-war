@@ -176,3 +176,35 @@ def test_a_failing_tick_surfaces_as_a_faulted_view_instead_of_a_silent_stall() -
         assert service.latest_view().tick_count == frozen, "a faulted service stops ticking"
     finally:
         service.stop()
+
+
+def test_a_failing_command_surfaces_as_a_faulted_view_instead_of_killing_the_thread() -> None:
+    service, clock, _world = _service()
+    service.start()
+    try:
+        assert _run_until(service, lambda: service.latest_view() is not None, clock, 0.0)
+        service.submit(SetSpeed("ludicrous"))
+
+        def has_faulted() -> bool:
+            view = service.latest_view()
+            return view is not None and view.faulted
+
+        assert _run_until(service, has_faulted, clock, 0.0)
+
+        # The signature of the old bug was is_running() going False while
+        # latest_view() kept returning a stale, unfaulted view. Assert the
+        # thread survived the bad command, not just that some view exists.
+        assert service.is_running() is True
+
+        view = service.latest_view()
+        assert view.faulted is True
+        assert "ludicrous" in view.fault_message
+
+        frozen = view.tick_count
+        for _ in range(20):
+            clock.advance(10.0)
+        assert (
+            service.latest_view().tick_count == frozen
+        ), "a faulted service stops ticking, whether the fault came from a tick or a command"
+    finally:
+        service.stop()

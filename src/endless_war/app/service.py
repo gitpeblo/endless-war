@@ -139,7 +139,11 @@ class SimulationService:
         last_tick_at = self._monotonic()
         self._publish()
         while not self._stopping.is_set():
-            changed = self._drain()
+            try:
+                changed = self._drain()
+            except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+                self._fault_message = f"{type(exc).__name__}: {exc}"
+                changed = True
             if self._stopping.is_set():
                 break
 
