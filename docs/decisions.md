@@ -58,6 +58,16 @@ ten-year observation run (`python -m endless_war --years 10 --seed 42`):
 3. **No `[balance]` value was tuned at the checkpoint.** The ten-year history is
    *not* interesting, but the cause is structural rather than a balance
    problem, and tuning config would have hidden it. See Consequences.
+4. **The contact rule: moving into a hostile-held province IS the attack.**
+   Tasks 6 and 7 shipped contradictory combat models; this resolves them in
+   favour of the one `battle.py` and `control.py` already presuppose. The
+   blocking branch in `update_movement` was removed, so an army ordered into a
+   province holding hostile armies enters it, and `resolve_battles` — which runs
+   later in the same tick — resolves the engagement there, with the province
+   controller's armies as defenders. **A future session must not re-introduce
+   the block.** Covered by `tests/test_movement.py::
+   test_move_into_hostile_province_is_the_attack` and the engine-level
+   regression `tests/test_engine.py::test_armies_in_contact_produce_combat`.
 
 **Reason:**
 - A raw ratio (`att_power / def_power`) is unbounded: a ten-to-one advantage
@@ -130,3 +140,42 @@ ten-year observation run (`python -m endless_war --years 10 --seed 42`):
 - This is left for a follow-up task deliberately. It is a change to the shape of
   the model in Tasks 6/7/10, not a balance tweak, and the observatory committed
   here is the instrument that will show whether a fix works.
+
+### Fix round 1 addendum (same day) — the contact rule is in, the checkpoint is still unmet
+
+Removing the movement block did exactly what the model predicted, and no more.
+Seed 42, ten years, before → after: **0 → 17 battles**, **0 → 29,315 casualties**,
+first-year territory [18, 18, 22, 24, 14] → [20, 14, 22, 31, 9]. Combat is now
+reachable and the `attacker_broke` retreat path in `control.py` is live code.
+
+**The decade is still frozen, for a second and independent reason.** All 17
+battles happen in year 1; years 2–10 produce none. The measured cause is *not*
+the AI attack gate — instrumenting all 14,600 ticks shows armies had a hostile
+neighbour on 229 army-ticks and chose to attack on **229 of 229**, declining
+zero times, so `_defenders_in` counting non-hostile third parties is real but
+currently inert, and it was left alone.
+
+The actual blocker is a **recovery deadlock between the AI and movement**:
+
+- `ai/strategic.py` gives a broken army (`organization < 0.30`) a `withdrawal`
+  order, setting `destination_id` to a friendly neighbour, *every tick*.
+- `movement.py` only recovers organization and morale in the branch guarded by
+  `elif army.destination_id is None`.
+
+So an army cannot recover because it is retreating, and it retreats because it
+has not recovered. Measured: **76.0% of army-ticks carry a destination** and
+**75.9% are in the broken state** — the two figures coincide because they are
+the same armies. By the end of year 1, **12 of 15 armies are broken, and the
+lowest organizations sit at exactly [0.0, 0.0, 0.04, 0.07, 0.07] in every one of
+years 1 through 10** — not a slow decline, a hard stop. Organization has only
+one source of increase in the whole simulation, and it is behind that gate.
+
+Two candidate remedies were measured in a scratchpad (neither applied): letting
+recovery run regardless of `destination_id`, and having a broken army hold when
+its province is already safe. Each extends the fighting to year 2 or 3 (12/17/15
+and 21/67 battles respectively, and the second leaves only 1 of 15 armies
+broken) but **neither unfreezes the decade**, so a third constraint remains
+beyond them. That is a change to the shape of Tasks 6/10 rather than a balance
+value, so it is escalated rather than improvised, and **no `[balance]` value was
+tuned in this round either**: tuning is only meaningful once the mechanism
+sustains combat, and it does not yet.
