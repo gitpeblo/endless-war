@@ -1,4 +1,5 @@
 import dataclasses
+import re
 from datetime import datetime, timezone
 
 import pytest
@@ -90,7 +91,11 @@ def test_collections_on_a_view_are_tuples_not_lists() -> None:
 
 def test_a_view_holds_no_simulation_objects() -> None:
     """A view must be safe to read while the simulation mutates its own state."""
-    fields = {f.name: f.type for f in dataclasses.fields(WorldView)}
-    joined = " ".join(str(t) for t in fields.values())
-    for forbidden in ("WorldState", "Province]", "Faction]", "Army", "War]"):
-        assert forbidden not in joined, f"view model leaks a simulation type: {forbidden}"
+    forbidden_types = ("WorldState", "Province", "Faction", "Army", "War", "Event")
+
+    for cls in (ProvinceCell, FactionRow, EventLine, WorldView):
+        for field in dataclasses.fields(cls):
+            annotation_str = str(field.type)
+            for forbidden in forbidden_types:
+                assert not re.search(rf"\b{forbidden}\b", annotation_str), \
+                    f"{cls.__name__}.{field.name} leaks {forbidden}: {annotation_str}"
