@@ -93,3 +93,50 @@ def test_bounded_attributes_stay_in_range_over_many_ticks() -> None:
     for army in w.armies.values():
         for attr in ("morale", "organization", "supply", "training", "equipment"):
             assert 0.0 <= getattr(army, attr) <= 1.0
+
+
+def test_army_that_advances_does_not_recover_that_tick() -> None:
+    """Recovery is for armies that held position, not for ones that marched.
+
+    docs/decisions.md (2026-09-23, recovery rule): the gate is whether the army
+    actually moved, not whether it holds an order. An advancing army already
+    pays the -0.03 march cost, so it must not also be handed recovery.
+    """
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    army = w.armies[0]
+    origin = army.province_id
+    target = w.provinces[origin].neighbors[0]
+    assert w.provinces[target].controller_faction_id == army.faction_id
+    army.organization = 0.5
+    army.supply = 1.0
+    army.destination_id = target
+
+    update_movement(w, random.Random(1), cfg)
+
+    assert army.province_id == target, "fixture: the army was supposed to advance"
+    assert army.organization < 0.5, "an advancing army must not recover organization"
+
+
+def test_army_too_disorganized_to_move_recovers() -> None:
+    """The recovery deadlock, as a regression.
+
+    An army that holds an order it cannot execute used to be locked out of
+    recovery forever, because the recovery branch was gated on having no
+    destination at all. Organization has exactly one source of increase in the
+    whole simulation; an army that never moves must be able to reach it.
+    """
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    army = w.armies[0]
+    origin = army.province_id
+    army.organization = 0.10          # below the 0.15 floor needed to advance
+    army.supply = 1.0
+    army.destination_id = w.provinces[origin].neighbors[0]
+
+    update_movement(w, random.Random(1), cfg)
+
+    assert army.province_id == origin, "fixture: too disorganized to advance"
+    assert army.organization > 0.10, (
+        "an army that holds position must recover even while under orders"
+    )

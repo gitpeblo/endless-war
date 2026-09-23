@@ -43,3 +43,41 @@ def test_armies_in_contact_produce_combat() -> None:
 
     casualties = sum(f.casualties for f in world.factions.values())
     assert casualties > 0, "armies in contact fought no battle in 20 ticks"
+
+
+def test_broken_army_in_safe_territory_recovers() -> None:
+    """Regression: a broken army in its own rear must dig in and recover.
+
+    The AI used to issue a withdrawal order to every broken army on every tick,
+    and movement only recovered organization when no order was held -- so an
+    army could not recover because it was retreating, and retreated because it
+    had not recovered. Measured over a ten-year run before the fix: 76.0% of
+    army-ticks carried a destination, 75.9% were broken, and 12 of 15 armies
+    sat at identical organization values in all ten years.
+
+    Fixture: at seed 42 army 0 (faction 0) stands in province 13, every one of
+    whose neighbours is also controlled by faction 0 -- a genuine interior
+    province, verified below rather than assumed.
+    """
+    cfg = load_config()
+    world = generate_world(seed=42, config=cfg)
+    army = world.armies[0]
+    assert army.faction_id == 0 and army.province_id == 13
+    assert all(
+        world.provinces[n].controller_faction_id == 0
+        for n in world.provinces[13].neighbors
+    ), "fixture: province 13 must be interior to faction 0"
+
+    army.organization = 0.20          # broken: below BROKEN_ORGANIZATION (0.30)
+    army.supply = 1.0
+
+    engine = SimulationEngine(world, cfg)
+    for _ in range(10):
+        engine.tick()
+
+    assert all(
+        world.provinces[n].controller_faction_id == 0
+        for n in world.provinces[13].neighbors
+    ), "fixture: the front was supposed to stay far away during the test"
+    assert army.province_id == 13, "a safe broken army should hold, not wander"
+    assert army.organization > 0.20, "a safe broken army must recover organization"

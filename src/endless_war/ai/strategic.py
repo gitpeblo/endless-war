@@ -31,6 +31,24 @@ def _friendly_neighbours(world: WorldState, army: Army) -> list[int]:
     ]
 
 
+def _standing_somewhere_safe(world: WorldState, army: Army) -> bool:
+    """True when nothing hostile is adjacent to, or standing in, the army's province.
+
+    A broken army in its own rear has nothing to withdraw from, and withdrawing
+    is what keeps it from recovering. See docs/decisions.md, 2026-09-23.
+    """
+    at_war = world.factions[army.faction_id].at_war_with
+    if not at_war:
+        return True
+    here = world.provinces[army.province_id]
+    if any(world.provinces[nid].controller_faction_id in at_war for nid in here.neighbors):
+        return False
+    return not any(
+        other.province_id == army.province_id and other.faction_id in at_war
+        for other in world.armies.values()
+    )
+
+
 def _defenders_in(world: WorldState, province_id: int, faction_id: int) -> int:
     return sum(
         a.manpower for a in world.armies.values()
@@ -50,7 +68,7 @@ def choose_strategic_actions(
         friendly = _friendly_neighbours(world, army)
         if broken:
             army.stance = "withdrawal"
-            if friendly:
+            if friendly and not _standing_somewhere_safe(world, army):
                 friendly.sort(key=lambda pid: -world.provinces[pid].supply_value)
                 army.destination_id = friendly[0]
             continue
