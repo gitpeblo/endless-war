@@ -93,3 +93,25 @@ def test_tray_summary_with_unknown_bound_faction_shows_unknown_and_world() -> No
     assert "999" in summary, "unknown faction id must be visible"
     assert "unknown" in summary.lower(), "must be marked as unknown"
     assert "factions" in summary.lower() or "wars" in summary.lower(), "world info present"
+
+
+from endless_war.app.snapshot import build_view as _build_view
+from endless_war.config import load_config as _load_config
+from endless_war.simulation.engine import SimulationEngine as _Engine
+from endless_war.simulation.worldgen import generate_world as _generate_world
+from endless_war.ui.panels import event_log_lines
+
+
+def test_event_log_lines_are_every_event_newest_first() -> None:
+    cfg = _load_config()
+    world = _generate_world(seed=42, config=cfg)
+    engine = _Engine(world, cfg)
+    for _ in range(4 * 365):
+        if len(world.events) > 20:
+            break
+        engine.tick()
+    view = _build_view(world, cfg, bound_faction_id=None, speed="1x")
+    lines = event_log_lines(view)
+    assert len(lines) == len(view.event_log) > 20
+    newest = view.event_log[-1]
+    assert lines[0] == f"{newest.simulated_at.date().isoformat()}  {newest.title}: {newest.body}"

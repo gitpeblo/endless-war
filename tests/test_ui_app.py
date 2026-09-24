@@ -186,3 +186,44 @@ def test_the_window_shows_a_legend() -> None:
         assert room.legend is not None
     finally:
         room.shutdown()
+
+
+def test_the_window_has_a_map_tab_and_a_history_tab() -> None:
+    service, cfg = _service()
+    room = WarRoom(service, cols=cfg["world"]["grid_cols"])
+    try:
+        pages = room.notebook.get_n_pages()
+        labels = [room.notebook.get_tab_label_text(room.notebook.get_nth_page(i)) for i in range(pages)]
+        assert labels == ["Map", "History"]
+    finally:
+        room.shutdown()
+
+
+def test_toggling_a_faction_sends_no_command() -> None:
+    from endless_war.app.snapshot import build_view
+    from endless_war.simulation.engine import SimulationEngine
+
+    cfg = load_config()
+    world = generate_world(seed=42, config=cfg)
+    SimulationEngine(world, cfg).run(40)
+    view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+
+    class RecordingService:
+        def __init__(self) -> None:
+            self.submitted = []
+
+        def latest_view(self):
+            return view
+
+        def submit(self, command) -> None:
+            self.submitted.append(command)
+
+    service = RecordingService()
+    room = WarRoom(service, cols=cfg["world"]["grid_cols"])
+    try:
+        room.refresh()
+        room.history.toggles[0].set_active(False)
+        room.history.toggles[0].set_active(True)
+        assert service.submitted == []
+    finally:
+        room.shutdown()

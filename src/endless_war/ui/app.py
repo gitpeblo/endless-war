@@ -19,6 +19,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 from endless_war.app.commands import BindFaction, Pause, Resume, SetSpeed  # noqa: E402
 from endless_war.app.service import SimulationService  # noqa: E402
 from endless_war.config import load_config  # noqa: E402
+from endless_war.ui.history_tab import HistoryTab  # noqa: E402
 from endless_war.ui.legend import LegendView  # noqa: E402
 from endless_war.ui.map_view import MapView  # noqa: E402
 from endless_war.ui.panels import (  # noqa: E402
@@ -79,14 +80,21 @@ class WarRoom:
         side.pack_start(self.status, False, False, 0)
         side.pack_start(self.legend, False, False, 0)
         middle.pack_start(side, False, False, 0)
-        outer.pack_start(middle, True, True, 0)
+        map_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        map_page.pack_start(middle, True, True, 0)
 
         self.events = Gtk.Label(label="")
         self.events.set_xalign(0.0)
         scroller = Gtk.ScrolledWindow()
         scroller.set_size_request(-1, 120)
         scroller.add(self.events)
-        outer.pack_start(scroller, False, False, 0)
+        map_page.pack_start(scroller, False, False, 0)
+
+        self.history = HistoryTab()
+        self.notebook = Gtk.Notebook()
+        self.notebook.append_page(map_page, Gtk.Label(label="Map"))
+        self.notebook.append_page(self.history, Gtk.Label(label="History"))
+        outer.pack_start(self.notebook, True, True, 0)
 
         self.tray = Tray(
             on_open=self._on_open,
@@ -129,6 +137,7 @@ class WarRoom:
         self.events.set_text("\n".join(reversed(event_lines(view))))
         self.map_view.set_view(view)
         self.legend.set_view(view)
+        self.history.set_view(view)
         self.tray.set_summary(tray_summary(view))
         self.tray.set_paused(self._paused)
 
