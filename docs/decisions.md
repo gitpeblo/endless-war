@@ -481,3 +481,25 @@ Two speeds were added above 16x, at the user's request: `32x` and `64x`. `clock.
 
 **Consequences:**
 - The earlier 2026-09-23 entry's "four discrete speeds" is superseded: there are now six, including `paused`.
+
+## 2026-09-24 — Isometric pixel-art map: dark terrain under a faction wash
+
+**Decision:**
+The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tileset" (CC0 1.0, https://newc-42.itch.io/pixel-art-isometric-map-tileset), committed as `src/endless_war/ui/assets/terrain.png`. Terrain is the simulation's own (`Province.terrain`), drawn darkened and desaturated; each province is washed in its controller's colour at 45 %. Tiles are scaled by whole numbers only, with nearest-neighbour sampling.
+
+**Reason:**
+- The user asked for 8-bit art that is serious rather than cartoonish, "grim and dark", and chose this pack. It is CC0, so it can live in the repo.
+- Terrain already changes battles (`[balance.terrain_defence]`) but was invisible; the map now shows it.
+- Of four mockups rendered from a real game, the user chose D. The per-tile outline (A, C) was busy and read weakly on dense forest, and bright terrain (A, B) was not grim.
+- Pixel art blurs at fractional scales, so the board picks the largest integer scale that fits and centres itself.
+
+**Alternatives considered:**
+- *Fantasy Hex Tiles (CC-BY 4.0).* A hex pack; would have changed the grid, and its towns and castles are medieval, which the user ruled out.
+- *Paid military packs.* Not free, and their licences forbid committing the files.
+
+**Consequences:**
+- Hills and urban have no exact tile in the pack. Hills use the low mountain range; urban uses the plotted fields, with a town glyph drawn on top.
+- The pack's snow, desert and lava tiles are unused; water forms a one-tile sea around the board.
+- `geometry.cell_for` / `province_at` are gone; `iso.province_at` replaces them, ready for province selection.
+- Darkening the sheet costs one Python pass over its pixels at first draw: 66 ms, measured.
+- The legend's terrain section makes the side column taller than the default 640 px window, so the side column scrolls.
