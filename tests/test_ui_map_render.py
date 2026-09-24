@@ -157,3 +157,19 @@ def test_a_capital_is_drawn_with_its_sprite() -> None:
         if _pixel(plain, cx + dx, cy + dy) != _pixel(capital, cx + dx, cy + dy)
     )
     assert changed > 60, "no capital building drawn on the province"
+
+
+def test_a_tank_is_never_covered_by_a_nearer_tile() -> None:
+    # Armies are drawn after the whole board, so a tall tile in front of a
+    # province cannot cut its tank off (the user asked for this).
+    view = _plain(_plain(_view(), 0), 13)
+    with_tank = _with(view, 0, has_armies=True)
+    flat_empty = _render(_with(view, 13, terrain="plains"))
+    flat = _render(_with(with_tank, 13, terrain="plains"))
+    peak = _render(_with(with_tank, 13, terrain="mountain"))
+    tank = [
+        (x, y) for x in range(WIDTH) for y in range(HEIGHT)
+        if _pixel(flat, x, y) != _pixel(flat_empty, x, y)
+    ]
+    assert len(tank) > 30, "premise: a tank is drawn"
+    assert all(_pixel(flat, x, y) == _pixel(peak, x, y) for x, y in tank)

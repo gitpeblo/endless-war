@@ -30,6 +30,7 @@ class ProvinceCell:
     has_supply_problem: bool
     terrain: str
     is_industrial: bool  # a supply source, like a capital
+    army_color_keys: tuple[str, ...] = ()  # one per faction with an army here, by faction id
 
 
 @dataclass(frozen=True, slots=True)

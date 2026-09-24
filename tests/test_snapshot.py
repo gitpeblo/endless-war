@@ -224,3 +224,12 @@ def test_industrial_provinces_are_flagged_as_the_supply_system_counts_them() -> 
         world.provinces[pid].industry >= INDUSTRIAL_SOURCE_THRESHOLD for pid in sorted(world.provinces)
     ]
     assert any(c.is_industrial for c in view.provinces), "premise: seed 42 has industry"
+
+
+def test_each_provinces_armies_carry_their_factions_colours() -> None:
+    world, cfg = _world()
+    view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    for cell in view.provinces:
+        factions = sorted({a.faction_id for a in world.armies.values() if a.province_id == cell.id})
+        assert cell.army_color_keys == tuple(world.factions[f].color_key for f in factions)
+    assert any(cell.army_color_keys for cell in view.provinces), "premise: armies exist"

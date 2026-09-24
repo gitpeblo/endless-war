@@ -24,14 +24,13 @@ from endless_war.ui.map_view import (  # noqa: E402
     BACKGROUND,
     SUPPLY_ALPHA,
     WASH_ALPHA,
-    _army,
     _blit,
     _face,
     _hatch,
     _outline,
     _wash,
 )
-from endless_war.ui.structures import SPRITE_SIZE, load_structure  # noqa: E402
+from endless_war.ui.structures import load_structure, tank_for  # noqa: E402
 from endless_war.ui.terrain import load_sheet, tile_for  # noqa: E402
 
 PAD = 8
@@ -64,7 +63,7 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
     entries += [
         LegendEntry("contested", "Occupied or under attack", NEUTRAL_KEY),
         LegendEntry("supply", "Supply problem", NEUTRAL_KEY),
-        LegendEntry("army", "Army present", NEUTRAL_KEY),
+        LegendEntry("army", "Army (in its faction's colour)", NEUTRAL_KEY),
         LegendEntry("capital", "Capital (supply source)", NEUTRAL_KEY),
         LegendEntry("town", "Town (urban province)", NEUTRAL_KEY),
         LegendEntry("heading", "Terrain", NEUTRAL_KEY),
@@ -73,7 +72,7 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
     return entries
 
 
-STRUCTURE_KINDS = ("capital", "town")
+STRUCTURE_KINDS = ("army", "capital", "town")
 
 
 def row_height(entry: LegendEntry) -> int:
@@ -115,8 +114,6 @@ def _symbol(cr, entry: LegendEntry, x: float, y: float) -> None:
         _hatch(cr, x, y, s)
     elif entry.kind == "supply":
         _wash(cr, x, y, s, (0.0, 0.0, 0.0), SUPPLY_ALPHA)
-    elif entry.kind == "army":
-        _army(cr, x, y, s)
 
 
 
@@ -134,7 +131,8 @@ def _sprite(cr, name: str, top: float) -> None:
     cr.save()
     cr.rectangle(PAD, top, THUMB_W, TERRAIN_ROW)
     cr.clip()
-    cr.set_source_surface(load_structure(name), PAD + (THUMB_W - SPRITE_SIZE) / 2, top - 1)
+    sprite = tank_for(NEUTRAL_KEY) if name == "tank" else load_structure(name)
+    cr.set_source_surface(sprite, PAD + (THUMB_W - sprite.get_width()) / 2, top - 1)
     cr.get_source().set_filter(cairo.FILTER_NEAREST)
     cr.paint()
     cr.restore()
@@ -156,7 +154,7 @@ def render_legend(cr, view: WorldView, width: float, height: float) -> None:
         if entry.kind == "terrain":
             _thumbnail(cr, sheet, entry.terrain, top)
         elif entry.kind in STRUCTURE_KINDS:
-            _sprite(cr, entry.kind, top)
+            _sprite(cr, "tank" if entry.kind == "army" else entry.kind, top)
         elif entry.kind != "heading":
             _symbol(cr, entry, *_swatch_origin(entries, index))
         cr.set_source_rgb(*(HEADING_RGB if entry.kind == "heading" else TEXT_RGB))

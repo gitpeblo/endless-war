@@ -21,8 +21,11 @@ def _province_cells(
     world: WorldState, low_supply_threshold: float
 ) -> tuple[ProvinceCell, ...]:
     armies_here: dict[int, bool] = {}
+    army_factions: dict[int, set[int]] = {}
     for aid in sorted(world.armies):
-        armies_here[world.armies[aid].province_id] = True
+        army = world.armies[aid]
+        armies_here[army.province_id] = True
+        army_factions.setdefault(army.province_id, set()).add(army.faction_id)
 
     cells = []
     for pid in sorted(world.provinces):
@@ -49,6 +52,11 @@ def _province_cells(
                 has_supply_problem=province.supply_value < low_supply_threshold,
                 terrain=province.terrain,
                 is_industrial=province.industry >= INDUSTRIAL_SOURCE_THRESHOLD,
+                army_color_keys=tuple(
+                    world.factions[fid].color_key
+                    for fid in sorted(army_factions.get(pid, ()))
+                    if fid in world.factions
+                ),
             )
         )
     return tuple(cells)

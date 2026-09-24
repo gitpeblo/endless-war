@@ -18,4 +18,4 @@ testpaths = ["tests"]
 markers = ["slow: runs many simulated years; about 6 seconds, not milliseconds"]
 
 [tool.setuptools.package-data]
-"endless_war.ui" = ["assets/*.png", "assets/*.md"]
+"endless_war.ui" = ["assets/*.png", "assets/*.md", "assets/structures/*.png", "assets/units/*.png"]

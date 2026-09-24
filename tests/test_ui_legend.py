@@ -115,8 +115,6 @@ def test_the_supply_and_occupied_swatches_are_visible_on_their_ground() -> None:
                 if sum(_px(surface, x + dx, y + dy)) < ground - 10
             )
             assert dark > 5, "no hatching visible on the occupied swatch"
-        if entry.kind == "army":
-            assert sum(_px(surface, x + 4.5, y + 2)) < ground - 10, "army dot not visible"
 
 
 def test_every_structure_is_explained_with_its_sprite() -> None:
@@ -127,7 +125,7 @@ def test_every_structure_is_explained_with_its_sprite() -> None:
     kinds = [e.kind for e in entries]
     surface = _render(view)
     background = (28, 31, 36)
-    for kind in ("capital", "town"):
+    for kind in ("army", "capital", "town"):
         assert kind in kinds and kinds.index(kind) < kinds.index("heading"), kind
         index = kinds.index(kind)
         top = PAD + sum(row_height(e) for e in entries[:index])

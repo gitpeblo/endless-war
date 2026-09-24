@@ -23,9 +23,10 @@ MARBLE = ((0xde, 0xda, 0xcc), (0xbc, 0xb8, 0xaa), (0x90, 0x8c, 0x80))
 GOLD_GLASS = ((0xc8, 0xa2, 0x52), (0x9c, 0x7a, 0x38), (0x72, 0x56, 0x26))
 PALE_LIT = (0xf4, 0xe8, 0xc0)
 # The army: smaller than any structure, olive drab on dark tracks.
-OLIVE = ((0x55, 0x5b, 0x40), (0x4a, 0x4f, 0x37), (0x36, 0x3a, 0x28))
-TRACK = ((0x3a, 0x3b, 0x36), (0x2c, 0x2d, 0x29), (0x1f, 0x20, 0x1d))
-TURRET = ((0x8a, 0x90, 0x6a), (0x72, 0x78, 0x56), (0x55, 0x5a, 0x40))
+# Neutral greys: the game tints the tank in its faction's colour at load time.
+OLIVE = ((0xb4, 0xb4, 0xb4), (0x8c, 0x8c, 0x8c), (0x64, 0x64, 0x64))
+TRACK = ((0x2e, 0x2f, 0x2b), (0x1e, 0x1f, 0x1c), (0x12, 0x13, 0x11))
+TURRET = ((0xe4, 0xe4, 0xe4), (0xc4, 0xc4, 0xc4), (0x9c, 0x9c, 0x9c))
 
 
 def P(u, v, z):
@@ -135,17 +136,25 @@ def industry(cr):
     cooling_tower(cr, 4, -3)
 
 
+TANK_K = 1.1  # the tank's size relative to the first draft
+
+
 def tank(cr):
     """A small tank: tracks with road wheels, hull, lighter turret, long barrel along +u."""
-    box(cr, -5.5, -3.5, 11, 2, 2, TRACK)                        # far track
-    box(cr, -5.5, 1.5, 11, 2, 2, TRACK)                         # near track
+    k = TANK_K
+
+    def b(u, v, U, V, H, pal, z0=0):
+        box(cr, u * k, v * k, U * k, V * k, H * k, pal, z0=z0 * k)
+
+    b(-5.5, -3.5, 11, 2, 2, TRACK)                              # far track
+    b(-5.5, 1.5, 11, 2, 2, TRACK)                               # near track
     for u in range(-4, 5, 2):                                   # road wheels, near side
-        x, y = P(u, 3.5, 1)
+        x, y = P(u * k, 3.5 * k, 1 * k)
         pixel(cr, x, y, TRACK[0])
-    box(cr, -5, -3, 10, 6, 2.5, OLIVE, z0=1)                    # hull
-    box(cr, 1.5, -0.75, 8, 1.5, 1.5, TURRET, z0=4.3)            # barrel, as light as the turret
-    box(cr, -2.5, -2, 5, 4, 2, TURRET, z0=3.5)                  # turret
-    x, y = P(-1.5, 2, 5.5)
+    b(-5, -3, 10, 6, 2.5, OLIVE, z0=1)                          # hull
+    b(1.5, -0.75, 8, 1.5, 1.5, TURRET, z0=4.3)                  # barrel
+    b(-2.5, -2, 5, 4, 2, TURRET, z0=3.5)                        # turret
+    x, y = P(-1.5 * k, 2 * k, 5.5 * k)
     pixel(cr, x, y, PALE_LIT)                                   # hatch light
 
 
@@ -187,4 +196,4 @@ if __name__ == "__main__":
     render(town, f"{out}/town.png")
     render(industry, f"{out}/industry.png", steam=(4, -3, 13))
     if len(sys.argv) > 2:
-        render(tank, f"{sys.argv[2]}/tank.png", size=24, origin=(12, 15))
+        render(tank, f"{sys.argv[2]}/tank.png", size=28, origin=(14, 18))

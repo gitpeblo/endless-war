@@ -19,12 +19,17 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 from endless_war.app.view_model import ProvinceCell, WorldView  # noqa: E402
 from endless_war.ui import iso  # noqa: E402
 from endless_war.ui.colors import faction_rgb, lighten  # noqa: E402
-from endless_war.ui.structures import ANCHOR, load_structure, structure_for  # noqa: E402
+from endless_war.ui.structures import (  # noqa: E402
+    ANCHOR,
+    TANK_ANCHOR,
+    load_structure,
+    structure_for,
+    tank_for,
+)
 from endless_war.ui.terrain import WATER, load_sheet, tile_for  # noqa: E402
 
 BACKGROUND = (0.11, 0.12, 0.14)
 HATCH_RGBA = (0.05, 0.05, 0.05, 0.55)
-ARMY_RGB = (0.08, 0.08, 0.08)
 WASH_ALPHA = 0.25  # lowered from 0.45, then 0.35, at the user's request: the land shows through
 SUPPLY_ALPHA = 0.35
 
@@ -101,11 +106,26 @@ def _structure(cr, name: str, x: float, y: float, s: float) -> None:
     cr.restore()
 
 
-def _army(cr, x: float, y: float, s: float) -> None:
+def _army(cr, x: float, y: float, s: float, color_keys: tuple[str, ...] = ("grey",)) -> None:
+    """A tank per faction present, in its colour, centred on the tile's top face.
+
+    Two factions (a battle) stand side by side; more than two show the first two.
+    """
+    keys = color_keys[:2] or ("grey",)
+    offsets = (0.0,) if len(keys) == 1 else (-7.0, 7.0)
+    for key, dx in zip(keys, offsets):
+        _tank(cr, key, x + dx * s, y, s)
+
+
+def _tank(cr, color_key: str, x: float, y: float, s: float) -> None:
     cx, cy = _centre(x, y, s)
-    cr.set_source_rgb(*ARMY_RGB)
-    cr.arc(cx + 9 * s, cy + 4 * s, 3.0 * s, 0, 6.2832)
-    cr.fill()
+    cr.save()
+    cr.translate(round(cx - TANK_ANCHOR[0] * s), round(cy - TANK_ANCHOR[1] * s))
+    cr.scale(s, s)
+    cr.set_source_surface(tank_for(color_key), 0, 0)
+    cr.get_source().set_filter(cairo.FILTER_NEAREST)
+    cr.paint()
+    cr.restore()
 
 
 def _province(cr, sheet, province: ProvinceCell, x: float, y: float, s: float, bound: int | None) -> None:
@@ -121,8 +141,6 @@ def _province(cr, sheet, province: ProvinceCell, x: float, y: float, s: float, b
     structure = structure_for(province)
     if structure is not None:
         _structure(cr, structure, x, y, s)
-    if province.has_armies:
-        _army(cr, x, y, s)
 
 
 def render_map(
@@ -152,6 +170,12 @@ def render_map(
             _blit(cr, sheet, WATER, x, y + iso.WATER_DROP * s, s)
         else:
             _province(cr, sheet, province, x, y, s, view.bound_faction_id)
+    # Armies go on top of the finished board, back to front, so no nearer
+    # tile or tall terrain can cut a tank off.
+    for col, row in iso.draw_order(board.cols, board.rows):
+        province = by_cell.get((col, row))
+        if province is not None and province.has_armies:
+            _army(cr, *iso.tile_origin(board, col, row), s, province.army_color_keys)
 
 
 class MapView(Gtk.DrawingArea):
