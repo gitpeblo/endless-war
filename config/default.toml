@@ -57,6 +57,16 @@ max_concurrent_wars = 2
 reinforcement_rate_per_tick = 0.002
 min_field_armies = 3
 new_army_share = 0.10
+# A garrison below this share of its cap no longer holds (sieges took ~150
+# ticks at 1 %). Reserves count for this much in war-declaration strength.
+garrison_broken_share = 0.10
+reserve_strength_weight = 0.25
+# A new army needs at least this many men, and starts as fresh conscripts.
+min_new_army = 5000
+new_army_equipment = 0.7
+new_army_morale = 0.7
+new_army_organization = 0.8
+new_army_training = 0.5
 low_supply_threshold = 0.35
 significant_battle_losses = 2000
 

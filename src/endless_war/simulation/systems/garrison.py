@@ -32,14 +32,10 @@ def garrison_strength(province: Province, config: dict[str, Any]) -> float:
     return garrison_cap(province, config) if province.garrison < 0 else province.garrison
 
 
-# A garrison below this share of its cap no longer holds. At 1 % a siege took
-# ~150 ticks, while an attacker breaks in ~15 (measured 2026-09-24).
-BROKEN_SHARE = 0.10
-
-
 def garrison_broken(province: Province, config: dict[str, Any]) -> bool:
-    """Below BROKEN_SHARE of its cap: the province can be occupied."""
-    return garrison_strength(province, config) < BROKEN_SHARE * garrison_cap(province, config)
+    """Below `garrison_broken_share` of its cap: the province can be occupied."""
+    share: float = config["balance"]["garrison_broken_share"]
+    return garrison_strength(province, config) < share * garrison_cap(province, config)
 
 
 def update_garrisons(world: WorldState, config: dict[str, Any]) -> None:

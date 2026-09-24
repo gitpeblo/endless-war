@@ -105,4 +105,5 @@ class WorldState:
     next_war_id: int = 0
     events: deque[Event] = field(default_factory=deque)
     next_event_id: int = 0
+    next_army_id: int = 0
     casualty_history: list[CasualtyReading] = field(default_factory=list)

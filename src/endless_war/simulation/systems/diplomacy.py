@@ -132,7 +132,8 @@ def _strength(world: WorldState, faction_id: int, config: dict[str, Any]) -> flo
     low = config["balance"]["low_supply_threshold"]
     held = [p for p in world.provinces.values() if p.controller_faction_id == faction_id]
     usable = sum(1 for p in held if p.supply_value >= low) / len(held) if held else 0.0
-    return army + world.factions[faction_id].manpower * 0.25 * usable
+    weight: float = config["balance"]["reserve_strength_weight"]
+    return army + world.factions[faction_id].manpower * weight * usable
 
 
 def _neighbouring_factions(world: WorldState, faction_id: int) -> list[int]:

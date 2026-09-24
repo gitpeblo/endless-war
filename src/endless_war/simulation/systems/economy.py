@@ -88,7 +88,7 @@ def reinforce_armies(world: WorldState, config: dict[str, Any]) -> None:
         if len(mine) >= min_armies:
             continue
         size = int(fac.manpower * new_share)
-        if size < 5_000:
+        if size < balance["min_new_army"]:
             continue
         capital = world.provinces.get(fac.capital_province_id)
         if capital is not None and capital.controller_faction_id == fid and capital.supply_value >= low:
@@ -102,9 +102,11 @@ def reinforce_armies(world: WorldState, config: dict[str, Any]) -> None:
             if not options:
                 continue
             home = max(options, key=lambda p: (world.provinces[p].supply_value, -p))
-        new_id = max(world.armies, default=-1) + 1
+        new_id = world.next_army_id  # never reused, unlike max(ids) + 1
+        world.next_army_id += 1
         world.armies[new_id] = Army(
             id=new_id, faction_id=fid, province_id=home, manpower=size,
-            equipment=0.7, morale=0.7, organization=0.8, training=0.5,
+            equipment=balance["new_army_equipment"], morale=balance["new_army_morale"],
+            organization=balance["new_army_organization"], training=balance["new_army_training"],
         )
         fac.manpower -= size

@@ -6,6 +6,7 @@ thresholds here are the first line of defence against a log nobody can read.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 
 from endless_war.domain.models import Event, WorldState
@@ -35,7 +36,7 @@ def record_events(
     battle_records: list[dict[str, Any]],
     capture_records: list[dict[str, Any]],
     diplomacy_events: list[dict[str, Any]],
-    surrender_records: list[dict[str, Any]] = (),
+    surrender_records: Sequence[dict[str, Any]] = (),
 ) -> None:
     """Turn this tick's system records into history."""
     significant: int = config["balance"]["significant_battle_losses"]

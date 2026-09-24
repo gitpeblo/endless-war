@@ -196,3 +196,4 @@ def generate_armies(world: WorldState, rng: random.Random, config: dict[str, Any
                 training=round(rng.uniform(0.5, 0.85), 3),
             )
             next_id += 1
+            world.next_army_id = next_id
