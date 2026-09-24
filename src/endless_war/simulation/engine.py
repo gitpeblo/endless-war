@@ -14,7 +14,10 @@ from endless_war.ai.strategic import choose_strategic_actions
 from endless_war.config import load_config
 from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.battle import resolve_battles
-from endless_war.simulation.systems.control import apply_control_changes
+from endless_war.simulation.systems.control import (
+    apply_control_changes,
+    surrender_trapped_armies,
+)
 from endless_war.simulation.systems.diplomacy import (
     note_captures,
     update_diplomacy,
@@ -53,11 +56,13 @@ class SimulationEngine:
         capture_records = apply_control_changes(
             self.world, self.rng, self.config, battle_records
         )
+        surrender_records = surrender_trapped_armies(self.world, self.config)
         update_exhaustion(self.world, self.rng, self.config)
         note_captures(self.world, capture_records)
         diplomacy_events = update_diplomacy(self.world, self.rng, self.config)
         record_events(
-            self.world, self.config, battle_records, capture_records, diplomacy_events
+            self.world, self.config, battle_records, capture_records, diplomacy_events,
+            surrender_records,
         )
         record_history(self.world)
         # --- SYSTEM PIPELINE END ---

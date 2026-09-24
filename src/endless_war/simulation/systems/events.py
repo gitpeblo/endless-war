@@ -35,6 +35,7 @@ def record_events(
     battle_records: list[dict[str, Any]],
     capture_records: list[dict[str, Any]],
     diplomacy_events: list[dict[str, Any]],
+    surrender_records: list[dict[str, Any]] = (),
 ) -> None:
     """Turn this tick's system records into history."""
     significant: int = config["balance"]["significant_battle_losses"]
@@ -57,6 +58,12 @@ def record_events(
              f"{world.provinces[capture['province_id']].name} from "
              f"{name(capture['from_faction'])}.",
              [capture["province_id"], capture["from_faction"], capture["to_faction"]])
+
+    for surrender in surrender_records:
+        _add(world, "military", "major", "Army surrendered",
+             f"{name(surrender['faction'])}'s army of {surrender['men']:,} surrendered in "
+             f"{world.provinces[surrender['province_id']].name}.",
+             [surrender["province_id"], surrender["faction"]])
 
     for battle in battle_records:
         total = battle["attacker_losses"] + battle["defender_losses"]

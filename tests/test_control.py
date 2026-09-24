@@ -93,3 +93,67 @@ def test_province_count_is_conserved() -> None:
     controlled = [p.controller_faction_id for p in w.provinces.values()]
     assert len(controlled) == 96
     assert all(c in w.factions for c in controlled)
+
+
+def _war(cfg):
+    w = generate_world(seed=42, config=cfg)
+    w.armies.clear()
+    w.factions[0].at_war_with = {3}
+    w.factions[3].at_war_with = {0}
+    return w
+
+
+def _record(pid, defender_broke=False, attacker_broke=False):
+    return {"province_id": pid, "attacker_faction": 0, "defender_faction": 3,
+            "attacker_losses": 0, "defender_losses": 0,
+            "attacker_broke": attacker_broke, "defender_broke": defender_broke}
+
+
+def test_a_broken_defender_falls_back_to_friendly_ground() -> None:
+    cfg = load_config()
+    w = _war(cfg)
+    target = _border_province(w, 3, 0)
+    assert any(w.provinces[n].controller_faction_id == 3 for n in w.provinces[target].neighbors), "premise"
+    w.armies[1] = Army(id=1, faction_id=3, province_id=target, manpower=10_000, organization=0.1)
+    w.armies[2] = Army(id=2, faction_id=0, province_id=target, manpower=30_000)
+    apply_control_changes(w, random.Random(1), cfg, [_record(target, defender_broke=True)])
+    moved = w.armies[1].province_id
+    assert moved != target and w.provinces[moved].controller_faction_id == 3
+
+
+def test_a_trapped_broken_army_surrenders() -> None:
+    from endless_war.simulation.systems.control import surrender_trapped_armies
+    cfg = load_config()
+    w = _war(cfg)
+    target = _border_province(w, 3, 0)
+    for n in w.provinces[target].neighbors:
+        w.provinces[n].controller_faction_id = 0  # encircled
+    w.armies[1] = Army(id=1, faction_id=3, province_id=target, manpower=12_345, organization=0.1)
+    w.armies[2] = Army(id=2, faction_id=0, province_id=target, manpower=30_000)
+    before = w.factions[3].casualties
+    records = surrender_trapped_armies(w, cfg)
+    assert 1 not in w.armies and 2 in w.armies
+    assert w.factions[3].casualties == before + 12_345
+    assert records == [{"kind": "surrender", "province_id": target, "faction": 3, "men": 12_345}]
+
+
+def test_a_broken_army_with_a_way_out_does_not_surrender() -> None:
+    from endless_war.simulation.systems.control import surrender_trapped_armies
+    cfg = load_config()
+    w = _war(cfg)
+    target = _border_province(w, 3, 0)
+    w.armies[1] = Army(id=1, faction_id=3, province_id=target, manpower=10_000, organization=0.1)
+    w.armies[2] = Army(id=2, faction_id=0, province_id=target, manpower=30_000)
+    assert surrender_trapped_armies(w, cfg) == [] and 1 in w.armies
+
+
+def test_an_encircled_army_in_good_order_does_not_surrender() -> None:
+    from endless_war.simulation.systems.control import surrender_trapped_armies
+    cfg = load_config()
+    w = _war(cfg)
+    target = _border_province(w, 3, 0)
+    for n in w.provinces[target].neighbors:
+        w.provinces[n].controller_faction_id = 0
+    w.armies[1] = Army(id=1, faction_id=3, province_id=target, manpower=10_000)
+    w.armies[2] = Army(id=2, faction_id=0, province_id=target, manpower=30_000)
+    assert surrender_trapped_armies(w, cfg) == [] and 1 in w.armies
