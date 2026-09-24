@@ -127,7 +127,7 @@ def test_every_structure_is_explained_with_its_sprite() -> None:
     kinds = [e.kind for e in entries]
     surface = _render(view)
     background = (28, 31, 36)
-    for kind in ("capital", "industry", "town"):
+    for kind in ("capital", "town"):
         assert kind in kinds and kinds.index(kind) < kinds.index("heading"), kind
         index = kinds.index(kind)
         top = PAD + sum(row_height(e) for e in entries[:index])

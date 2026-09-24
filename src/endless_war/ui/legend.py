@@ -66,7 +66,6 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
         LegendEntry("supply", "Supply problem", NEUTRAL_KEY),
         LegendEntry("army", "Army present", NEUTRAL_KEY),
         LegendEntry("capital", "Capital (supply source)", NEUTRAL_KEY),
-        LegendEntry("industry", "Industry (supply source)", NEUTRAL_KEY),
         LegendEntry("town", "Town (urban province)", NEUTRAL_KEY),
         LegendEntry("heading", "Terrain", NEUTRAL_KEY),
     ]
@@ -74,7 +73,7 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
     return entries
 
 
-STRUCTURE_KINDS = ("capital", "industry", "town")
+STRUCTURE_KINDS = ("capital", "town")
 
 
 def row_height(entry: LegendEntry) -> int:

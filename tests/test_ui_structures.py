@@ -26,5 +26,5 @@ def test_every_structure_sprite_ships() -> None:
 def test_one_structure_per_province_capital_first() -> None:
     assert structure_for(_cell()) is None
     assert structure_for(_cell(terrain="urban")) == "town"
-    assert structure_for(_cell(is_industrial=True, terrain="urban")) == "industry"
+    assert structure_for(_cell(is_industrial=True)) is None, "industry is not drawn"
     assert structure_for(_cell(is_capital=True, is_industrial=True, terrain="urban")) == "capital"

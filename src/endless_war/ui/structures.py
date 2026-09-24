@@ -14,7 +14,7 @@ import cairo
 from endless_war.app.view_model import ProvinceCell
 
 STRUCTURES_DIR = Path(__file__).parent / "assets" / "structures"
-NAMES = ("capital", "industry", "town")
+NAMES = ("capital", "town")
 SPRITE_SIZE = 32
 ANCHOR = (16, 22)  # footprint centre within the sprite
 
@@ -31,11 +31,13 @@ def load_structure(name: str) -> cairo.ImageSurface:
 
 
 def structure_for(province: ProvinceCell) -> str | None:
-    """The one structure a province shows: capital, then industry, then town."""
+    """The one structure a province shows: capital, then town.
+
+    Industry is not drawn: 35 of 96 provinces are industrial at seed 42, and
+    a plant on each crowded the map (the user chose to remove it).
+    """
     if province.is_capital:
         return "capital"
-    if province.is_industrial:
-        return "industry"
     if province.terrain == "urban":
         return "town"
     return None
