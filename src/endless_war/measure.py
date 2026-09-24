@@ -24,12 +24,33 @@ GATE = {
 }
 
 
+def _enclaves(world) -> set[int]:
+    """Provinces whose every neighbour is held by another faction, at war or not.
+
+    This is what the user reported: a lone cell that survives war after war.
+    """
+    return {
+        pid for pid, p in world.provinces.items()
+        if p.neighbors and all(
+            world.provinces[n].controller_faction_id != p.controller_faction_id for n in p.neighbors
+        )
+    }
+
+
 def _islands(world) -> set[int]:
+    """Provinces whose every neighbour is held by a faction at war with their holder.
+
+    An enclave among factions at peace with it is not a stuck front; the spec's
+    "enemy-surrounded" means at war.
+    """
     found = set()
     for pid, province in world.provinces.items():
         mine = province.controller_faction_id
+        if mine not in world.factions:
+            continue
+        at_war = world.factions[mine].at_war_with
         if province.neighbors and all(
-            world.provinces[n].controller_faction_id != mine for n in province.neighbors
+            world.provinces[n].controller_faction_id in at_war for n in province.neighbors
         ):
             found.add(pid)
     return found
@@ -42,7 +63,8 @@ def measure(seed: int, years: int = 10) -> dict:
     battles = captures = violations = 0
     battle_years: set[int] = set()
     island_since: dict[int, int] = {}
-    longest = 0
+    enclave_since: dict[int, int] = {}
+    longest = longest_enclave = 0
     yearly: list[tuple] = []
     largest = 0.0
     eliminated: dict[int, int] = {}
@@ -64,6 +86,12 @@ def measure(seed: int, years: int = 10) -> dict:
                 longest = max(longest, day - island_since.pop(pid))
         for pid in islands:
             island_since.setdefault(pid, day)
+        enclaves = _enclaves(world)
+        for pid in list(enclave_since):
+            if pid not in enclaves:
+                longest_enclave = max(longest_enclave, day - enclave_since.pop(pid))
+        for pid in enclaves:
+            enclave_since.setdefault(pid, day)
         held: dict[int, int] = {}
         for province in world.provinces.values():
             held[province.controller_faction_id] = held.get(province.controller_faction_id, 0) + 1
@@ -77,6 +105,8 @@ def measure(seed: int, years: int = 10) -> dict:
     last_day = years * 365
     for since in island_since.values():
         longest = max(longest, last_day - since)
+    for since in enclave_since.values():
+        longest_enclave = max(longest_enclave, last_day - since)
     return {
         "seed": seed,
         "battles": battles,
@@ -86,6 +116,7 @@ def measure(seed: int, years: int = 10) -> dict:
         "map_changes": sum(1 for a, b in zip(yearly, yearly[1:]) if a != b),
         "largest_share": largest,
         "longest_island_days": longest,
+        "longest_enclave_days": longest_enclave,
         "events": world.next_event_id,
         "eliminated": eliminated,
         "wars_started": len(world.wars),
@@ -113,7 +144,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--years", type=int, default=10)
     args = parser.parse_args(argv)
     cols = ("seed", "battles", "battle_years", "captures", "captures_per_battle", "map_changes",
-            "largest_share", "longest_island_days", "events", "wars_started", "wars_ended",
+            "largest_share", "longest_island_days", "longest_enclave_days", "events", "wars_started", "wars_ended",
             "eliminated", "violations", "seconds")
     print(" | ".join(cols))
     for seed in args.seeds:
