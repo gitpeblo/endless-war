@@ -140,7 +140,7 @@ def test_rendering_is_stable_for_the_same_view() -> None:
 
 def test_the_wash_lets_the_terrain_show_through() -> None:
     # The user asked for more transparency than the first 45 %.
-    assert map_view.WASH_ALPHA == 0.35
+    assert map_view.WASH_ALPHA == 0.25
 
 
 def test_a_capital_is_drawn_with_its_sprite() -> None:

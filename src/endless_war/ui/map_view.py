@@ -25,7 +25,7 @@ from endless_war.ui.terrain import WATER, load_sheet, tile_for  # noqa: E402
 BACKGROUND = (0.11, 0.12, 0.14)
 HATCH_RGBA = (0.05, 0.05, 0.05, 0.55)
 ARMY_RGB = (0.08, 0.08, 0.08)
-WASH_ALPHA = 0.35  # lowered from 0.45 at the user's request: more terrain shows through
+WASH_ALPHA = 0.25  # lowered from 0.45, then 0.35, at the user's request: the land shows through
 SUPPLY_ALPHA = 0.35
 
 
