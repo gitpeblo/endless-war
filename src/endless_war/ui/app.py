@@ -19,6 +19,7 @@ from gi.repository import GLib, Gtk  # noqa: E402
 from endless_war.app.commands import BindFaction, Pause, Resume, SetSpeed  # noqa: E402
 from endless_war.app.service import SimulationService  # noqa: E402
 from endless_war.config import load_config  # noqa: E402
+from endless_war.ui.legend import LegendView  # noqa: E402
 from endless_war.ui.map_view import MapView  # noqa: E402
 from endless_war.ui.panels import (  # noqa: E402
     event_lines,
@@ -47,6 +48,11 @@ class WarRoom:
         outer.set_border_width(6)
         self.window.add(outer)
 
+        # Presenting the window from the tray gives it keyboard focus, and GTK
+        # would hand that to the first focusable button -- so a space typed
+        # into another app at that moment changed the speed. The buttons stay
+        # clickable; the tray menu is the keyboard route to the same controls.
+        self.toolbar_buttons: list[Gtk.Button] = []
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.header = Gtk.Label(label="")
         self.header.set_xalign(0.0)
@@ -55,9 +61,13 @@ class WarRoom:
             button = Gtk.Button(label=speed)
             button.connect("clicked", lambda _b, s=speed: self._set_speed(s))
             bar.pack_start(button, False, False, 0)
+            self.toolbar_buttons.append(button)
         self._pause_button = Gtk.Button(label="Pause")
         self._pause_button.connect("clicked", lambda _b: self._toggle_pause())
         bar.pack_start(self._pause_button, False, False, 0)
+        self.toolbar_buttons.append(self._pause_button)
+        for button in self.toolbar_buttons:
+            button.set_can_focus(False)
         outer.pack_start(bar, False, False, 0)
 
         middle = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -66,8 +76,12 @@ class WarRoom:
         self.status = Gtk.Label(label="")
         self.status.set_xalign(0.0)
         self.status.set_yalign(0.0)
-        self.status.set_size_request(220, -1)
-        middle.pack_start(self.status, False, False, 0)
+        self.legend = LegendView()
+        side = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        side.set_size_request(220, -1)
+        side.pack_start(self.status, False, False, 0)
+        side.pack_start(self.legend, False, False, 0)
+        middle.pack_start(side, False, False, 0)
         outer.pack_start(middle, True, True, 0)
 
         self.events = Gtk.Label(label="")
@@ -111,8 +125,10 @@ class WarRoom:
         self.status.set_text(
             "\n".join(f"{label}  {value}".rstrip() for label, value in status_rows(view))
         )
-        self.events.set_text("\n".join(event_lines(view)))
+        # Newest first: the feed's scroller opens at the top.
+        self.events.set_text("\n".join(reversed(event_lines(view))))
         self.map_view.set_view(view)
+        self.legend.set_view(view)
         self.tray.set_summary(tray_summary(view))
         self.tray.set_paused(self._paused)
 

@@ -117,3 +117,59 @@ def test_a_refresh_failure_is_shown_and_does_not_stop_the_timer() -> None:
     finally:
         room.shutdown()
         service.stop()
+
+
+def test_the_toolbar_buttons_do_not_take_keyboard_focus() -> None:
+    # Presenting the window from the tray gives it keyboard focus, and GTK
+    # hands that to the first focusable widget -- the 1x button -- so a space
+    # typed into another app at that moment would change the speed. Observed.
+    service, cfg = _service()
+    room = WarRoom(service, cols=cfg["world"]["grid_cols"])
+    try:
+        for button in room.toolbar_buttons:
+            assert not button.get_can_focus(), button.get_label()
+    finally:
+        room.shutdown()
+
+
+def test_the_event_feed_shows_the_newest_event_first() -> None:
+    # The feed sits in a scroller pinned to the top, so oldest-first put the
+    # newest events below the fold and showed weeks-old lines instead.
+    from endless_war.app.snapshot import build_view
+    from endless_war.simulation.engine import SimulationEngine
+
+    cfg = load_config()
+    world = generate_world(seed=42, config=cfg)
+    engine = SimulationEngine(world, cfg)
+    view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    for _ in range(400):
+        if len(view.recent_events) >= 2:
+            break
+        engine.tick()
+        view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    assert len(view.recent_events) >= 2, "premise: at least two events"
+
+    class StubService:
+        def latest_view(self):
+            return view
+
+        def submit(self, _command) -> None:
+            pass
+
+    room = WarRoom(StubService(), cols=cfg["world"]["grid_cols"])
+    try:
+        room.refresh()
+        newest = view.recent_events[-1]
+        first_line = room.events.get_text().splitlines()[0]
+        assert newest.title in first_line and newest.body in first_line
+    finally:
+        room.shutdown()
+
+
+def test_the_window_shows_a_legend() -> None:
+    service, cfg = _service()
+    room = WarRoom(service, cols=cfg["world"]["grid_cols"])
+    try:
+        assert room.legend is not None
+    finally:
+        room.shutdown()
