@@ -13,6 +13,7 @@ from typing import Any
 
 from endless_war.domain.models import Army, WorldState
 from endless_war.simulation.systems import clamp
+from endless_war.simulation.systems.garrison import garrison_broken, garrison_strength
 from endless_war.simulation.systems.movement import armies_in, hostile_armies_in
 
 
@@ -42,12 +43,26 @@ def effective_power(
     return army.manpower * quality * terrain
 
 
-def _battle_provinces(world: WorldState) -> list[int]:
-    """Provinces holding armies of two mutually hostile factions."""
+def _battle_provinces(world: WorldState, config: dict[str, Any]) -> list[int]:
+    """Provinces holding armies of two mutually hostile factions, or an army
+    hostile to the controller facing an unbroken garrison."""
     contested: list[int] = []
+    by_province: dict[int, set[int]] = {}
+    for army in world.armies.values():
+        if army.manpower > 0:
+            by_province.setdefault(army.province_id, set()).add(army.faction_id)
     for pid in sorted(world.provinces):
-        present = armies_in(world, pid)
-        factions = {a.faction_id for a in present if a.manpower > 0}
+        factions = by_province.get(pid, set())
+        if not factions:
+            continue
+        controller = world.provinces[pid].controller_faction_id
+        if (
+            controller in world.factions
+            and factions & world.factions[controller].at_war_with
+            and not garrison_broken(world.provinces[pid], config)
+        ):
+            contested.append(pid)
+            continue
         if len(factions) < 2:
             continue
         for fid in sorted(factions):
@@ -67,7 +82,8 @@ def resolve_battles(
     defender_break: float = config["balance"]["defender_break_organization"]
     records: list[dict[str, Any]] = []
 
-    for pid in _battle_provinces(world):
+    loss_mult: float = config["balance"]["garrison_loss_multiplier"]
+    for pid in _battle_provinces(world, config):
         province = world.provinces[pid]
         present = [a for a in armies_in(world, pid) if a.manpower > 0]
         defender_faction = province.controller_faction_id
@@ -75,7 +91,8 @@ def resolve_battles(
         attackers = [
             a for a in hostile_armies_in(world, pid, defender_faction) if a.manpower > 0
         ]
-        if not defenders or not attackers:
+        garrison = 0.0 if garrison_broken(province, config) else garrison_strength(province, config)
+        if not attackers or (not defenders and garrison <= 0):
             continue
         attacker_faction = attackers[0].faction_id
 
@@ -84,7 +101,7 @@ def resolve_battles(
         )
         def_power = sum(
             effective_power(d, world, True, terrain_defence) for d in defenders
-        )
+        ) + garrison
         att_power *= rng.uniform(0.9, 1.1)
         def_power *= rng.uniform(0.9, 1.1)
         total = att_power + def_power
@@ -97,12 +114,16 @@ def resolve_battles(
 
         attacker_losses = _apply_losses(attackers, attacker_rate)
         defender_losses = _apply_losses(defenders, defender_rate)
+        if garrison > 0:
+            lost = garrison * min(1.0, defender_rate * loss_mult)
+            province.garrison = garrison - lost
+            defender_losses += int(lost)
 
         world.factions[attacker_faction].casualties += attacker_losses
         world.factions[defender_faction].casualties += defender_losses
 
         attacker_broke = all(a.organization <= attacker_break for a in attackers)
-        defender_broke = all(d.organization <= defender_break for d in defenders)
+        defender_broke = bool(defenders) and all(d.organization <= defender_break for d in defenders)
 
         records.append({
             "province_id": pid,

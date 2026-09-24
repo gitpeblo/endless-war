@@ -13,6 +13,7 @@ from typing import Any
 
 from endless_war.domain.models import Army, WorldState
 from endless_war.simulation.systems.battle import effective_power
+from endless_war.simulation.systems.garrison import garrison_broken, garrison_strength
 
 def _hostile_neighbours(world: WorldState, army: Army) -> list[int]:
     at_war = world.factions[army.faction_id].at_war_with
@@ -48,7 +49,8 @@ def _standing_somewhere_safe(world: WorldState, army: Army) -> bool:
 
 
 def _defence_of(
-    world: WorldState, province_id: int, attacker_faction: int, terrain: dict[str, float]
+    world: WorldState, province_id: int, attacker_faction: int, terrain: dict[str, float],
+    config: dict[str, Any] | None = None,
 ) -> float:
     """The combat strength an attacker would meet: armies there it is at war with.
 
@@ -56,12 +58,16 @@ def _defence_of(
     look impregnable, so it was never attacked and its faction never died.
     """
     at_war = world.factions[attacker_faction].at_war_with
-    return sum(
+    armies = sum(
         effective_power(world.armies[aid], world, True, terrain)
         for aid in sorted(world.armies)
         if world.armies[aid].province_id == province_id
         and world.armies[aid].faction_id in at_war
     )
+    province = world.provinces[province_id]
+    if config is not None and province.controller_faction_id in at_war and not garrison_broken(province, config):
+        armies += garrison_strength(province, config)  # the land defends itself
+    return armies
 
 
 def _front_pressure(
@@ -133,6 +139,25 @@ def _route(
     return step
 
 
+def _toward_supply(world: WorldState, army: Army, low: float) -> int | None:
+    """First step toward the nearest own province with supply to recover in."""
+    start = army.province_id
+    parent: dict[int, int | None] = {start: None}
+    queue = deque([start])
+    while queue:
+        pid = queue.popleft()
+        if pid != start and world.provinces[pid].supply_value >= low:
+            step = pid
+            while parent[step] != start:
+                step = parent[step]
+            return step
+        for nid in sorted(world.provinces[pid].neighbors):
+            if nid not in parent and world.provinces[nid].controller_faction_id == army.faction_id:
+                parent[nid] = pid
+                queue.append(nid)
+    return None
+
+
 def choose_strategic_actions(
     world: WorldState, rng: random.Random, config: dict[str, Any]
 ) -> None:
@@ -150,7 +175,12 @@ def choose_strategic_actions(
         friendly = _friendly_neighbours(world, army)
         if broken:
             army.stance = "withdrawal"
-            if friendly and not _standing_somewhere_safe(world, army):
+            low: float = config["balance"]["low_supply_threshold"]
+            if world.provinces[army.province_id].supply_value < low:
+                # It cannot recover here: fall back toward supply instead of
+                # sitting at zero organization forever (seed 99, 2026-09-24).
+                army.destination_id = _toward_supply(world, army, low)
+            elif friendly and not _standing_somewhere_safe(world, army):
                 friendly.sort(key=lambda pid: -world.provinces[pid].supply_value)
                 army.destination_id = friendly[0]
             continue
@@ -170,20 +200,20 @@ def choose_strategic_actions(
         own = effective_power(army, world, False, terrain)
         invaded = [
             pid for pid in friendly
-            if _defence_of(world, pid, army.faction_id, terrain) > 0
+            if _defence_of(world, pid, army.faction_id, terrain, config) > 0
         ]
         hostile = _hostile_neighbours(world, army)
         if invaded or hostile:
             def beatable(pid: int) -> bool:
-                return _defence_of(world, pid, army.faction_id, terrain) < own * attack_ratio
+                return _defence_of(world, pid, army.faction_id, terrain, config) < own * attack_ratio
 
-            defended = [pid for pid in hostile if _defence_of(world, pid, army.faction_id, terrain) > 0]
+            defended = [pid for pid in hostile if _defence_of(world, pid, army.faction_id, terrain, config) > 0]
             empty = [pid for pid in hostile if pid not in defended]
             target = None
             for group in (invaded, defended, empty):
                 options = sorted(
                     (pid for pid in group if beatable(pid)),
-                    key=lambda pid: (_defence_of(world, pid, army.faction_id, terrain), pid),
+                    key=lambda pid: (_defence_of(world, pid, army.faction_id, terrain, config), pid),
                 )
                 if options:
                     target = options[0]

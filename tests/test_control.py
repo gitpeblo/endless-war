@@ -24,6 +24,7 @@ def test_lone_army_captures_an_undefended_hostile_province() -> None:
     w.factions[0].at_war_with = {3}
     w.factions[3].at_war_with = {0}
     target = _border_province(w, 3, 0)
+    w.provinces[target].garrison = 0.0  # undefended now means: its garrison is broken
     w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
     # Capture now takes occupation_ticks of uninterrupted holding.
     for _ in range(cfg["balance"]["occupation_ticks"] - 1):
@@ -40,6 +41,7 @@ def test_owner_is_unchanged_by_occupation() -> None:
     w.factions[0].at_war_with = {3}
     w.factions[3].at_war_with = {0}
     target = _border_province(w, 3, 0)
+    w.provinces[target].garrison = 0.0  # undefended now means: its garrison is broken
     w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
     for _ in range(cfg["balance"]["occupation_ticks"]):
         apply_control_changes(w, random.Random(1), cfg, [])

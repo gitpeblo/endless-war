@@ -19,10 +19,11 @@ def _view_with_events():
     world = generate_world(seed=42, config=cfg)
     engine = SimulationEngine(world, cfg)
     for _ in range(4 * 365):
-        if len(world.events) >= 2:
+        if len(world.events) >= 4:
             break
         engine.tick()
-    assert len(world.events) >= 2, "premise: at least two events"
+    # The eviction test pops two events, so it needs a few to begin with.
+    assert len(world.events) >= 4, "premise: at least four events"
     return engine, world, cfg, build_view(world, cfg, bound_faction_id=None, speed="1x")
 
 

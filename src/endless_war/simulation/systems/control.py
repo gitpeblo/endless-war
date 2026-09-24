@@ -11,6 +11,7 @@ import random
 from typing import Any
 
 from endless_war.domain.models import WorldState
+from endless_war.simulation.systems.garrison import garrison_broken
 from endless_war.simulation.systems.movement import armies_in
 
 
@@ -63,6 +64,9 @@ def apply_control_changes(
             current is not None and occupier not in world.factions[current].at_war_with
         ):
             province.occupation = None
+            continue
+        if not garrison_broken(province, config):
+            province.occupation = None  # the garrison still holds; fight it first
             continue
         # A capture takes `occupation_ticks` of holding the province alone and
         # uninterrupted; leaving or being contested resets it. Before this, an

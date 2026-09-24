@@ -39,6 +39,24 @@ min_advance_organization = 0.15
 # uninterrupted, before control changes. Stops capture churn (armies trading
 # an empty province every other tick). 4 ticks = one simulated day.
 occupation_ticks = 4
+# Garrisons (docs/superpowers/specs/2026-09-24-war-model-redesign.md): every
+# province defends itself with population x per-capita x terrain strength, in
+# effective-power units; an occupier's garrison is a fraction of that.
+garrison_per_capita = 0.01
+garrison_regen_per_tick = 0.01
+occupied_garrison_factor = 0.3
+garrison_loss_multiplier = 8.0
+# Wars end: exhaustion also grows with time at war; a side that has lost its
+# capital and most of its pre-war land capitulates.
+war_weariness_per_tick = 0.0004
+capitulation_land_fraction = 0.5
+max_concurrent_wars = 2
+# Reinforcement (closes the ledgered "reinforcement gap"): a share of the
+# reserve pool flows each tick into armies on supplied own land, and a faction
+# below `min_field_armies` raises a fresh army from its reserves.
+reinforcement_rate_per_tick = 0.002
+min_field_armies = 3
+new_army_share = 0.10
 low_supply_threshold = 0.35
 significant_battle_losses = 2000
 

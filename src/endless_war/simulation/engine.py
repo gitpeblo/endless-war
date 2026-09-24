@@ -23,8 +23,13 @@ from endless_war.simulation.systems.diplomacy import (
     update_diplomacy,
     update_exhaustion,
 )
-from endless_war.simulation.systems.economy import update_economy, update_recruitment
+from endless_war.simulation.systems.economy import (
+    reinforce_armies,
+    update_economy,
+    update_recruitment,
+)
 from endless_war.simulation.systems.events import record_events
+from endless_war.simulation.systems.garrison import update_garrisons
 from endless_war.simulation.systems.history import record_history
 from endless_war.simulation.systems.movement import update_movement
 from endless_war.simulation.systems.supply import update_supply
@@ -49,6 +54,7 @@ class SimulationEngine:
         # --- SYSTEM PIPELINE START (fixed order, do not reorder) ---
         update_economy(self.world, self.rng, self.config)
         update_recruitment(self.world, self.rng, self.config)
+        reinforce_armies(self.world, self.config)
         update_supply(self.world, self.rng, self.config)
         choose_strategic_actions(self.world, self.rng, self.config)
         update_movement(self.world, self.rng, self.config)
@@ -57,6 +63,7 @@ class SimulationEngine:
             self.world, self.rng, self.config, battle_records
         )
         surrender_records = surrender_trapped_armies(self.world, self.config)
+        update_garrisons(self.world, self.config)
         update_exhaustion(self.world, self.rng, self.config)
         note_captures(self.world, capture_records)
         diplomacy_events = update_diplomacy(self.world, self.rng, self.config)

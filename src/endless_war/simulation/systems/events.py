@@ -51,6 +51,10 @@ def record_events(
             _add(world, "diplomacy", "critical", "War declared",
                  f"{name(attacker)} has declared war on {name(defender)}.",
                  [attacker, defender])
+        elif event["kind"] == "peace" and event.get("reason") == "capitulation":
+            _add(world, "diplomacy", "critical", "War over",
+                 f"The war between {name(attacker)} and {name(defender)} is over: "
+                 f"one side has capitulated.", [attacker, defender])
         elif event["kind"] == "peace" and event.get("reason") == "elimination":
             _add(world, "diplomacy", "critical", "War over",
                  f"The war between {name(attacker)} and {name(defender)} is over: "

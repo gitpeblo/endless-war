@@ -12,12 +12,14 @@ from typing import Any
 
 from endless_war.domain.models import War, WorldState
 from endless_war.simulation.systems import clamp
+from endless_war.simulation.systems.battle import effective_power
 
 
 def update_exhaustion(world: WorldState, rng: random.Random, config: dict[str, Any]) -> None:
     """Grow exhaustion from accumulated casualties; decay it in peacetime."""
     factor: float = config["balance"]["exhaustion_per_casualty_fraction"]
     decay: float = config["balance"]["exhaustion_decay_per_tick"]
+    weariness: float = config["balance"]["war_weariness_per_tick"]
 
     for fid in sorted(world.factions):
         fac = world.factions[fid]
@@ -28,7 +30,10 @@ def update_exhaustion(world: WorldState, rng: random.Random, config: dict[str, A
                 a.manpower for a in world.armies.values() if a.faction_id == fid
             )
             base = max(1, fac.manpower + army_strength)
-            fac.exhaustion = clamp(fac.exhaustion + (new_casualties / base) * factor)
+            # War weariness: exhaustion also grows with time at war, which makes
+            # the exhaustion peace reachable (the casualty term alone barely
+            # moved, docs/decisions.md 2026-09-23).
+            fac.exhaustion = clamp(fac.exhaustion + (new_casualties / base) * factor + weariness)
         else:
             fac.exhaustion = clamp(fac.exhaustion - decay)
         fac.war_support = clamp(0.9 - fac.exhaustion * 0.8)
@@ -93,9 +98,41 @@ def _settle(world: WorldState, war: War) -> list[tuple[int, int | None, int]]:
     return annexed
 
 
-def _strength(world: WorldState, faction_id: int) -> float:
-    army = sum(a.manpower for a in world.armies.values() if a.faction_id == faction_id)
-    return army + world.factions[faction_id].manpower * 0.5
+def _capitulated(world: WorldState, war: War, side: set[int], fraction: float) -> bool:
+    """Every faction on `side` has lost its capital and most of its pre-war land."""
+    if not war.start_land:
+        return False
+    for fid in sorted(side):
+        fac = world.factions[fid]
+        if fac.eliminated:
+            continue
+        held = sum(1 for p in world.provinces.values() if p.controller_faction_id == fid)
+        capital = world.provinces.get(fac.capital_province_id)
+        capital_lost = capital is not None and capital.controller_faction_id != fid
+        if not (capital_lost and held < fraction * war.start_land.get(fid, held + 1)):
+            return False
+    return True
+
+
+def _strength(world: WorldState, faction_id: int, config: dict[str, Any]) -> float:
+    """Combat strength for war decisions: armies by effective power, plus reserves.
+
+    Headcount made a faction with 88,000 broken men look too strong to attack,
+    so the healthy neighbours of a collapsed faction never declared on it.
+    """
+    terrain = config["balance"]["terrain_defence"]
+    army = sum(
+        effective_power(world.armies[aid], world, False, terrain)
+        for aid in sorted(world.armies)
+        if world.armies[aid].faction_id == faction_id
+    )
+    # Reserves count only in proportion to supplied land: a rump state with no
+    # supply source cannot field its pool, and counting it anyway kept healthy
+    # neighbours from ever declaring on it (seed 99, 2026-09-24).
+    low = config["balance"]["low_supply_threshold"]
+    held = [p for p in world.provinces.values() if p.controller_faction_id == faction_id]
+    usable = sum(1 for p in held if p.supply_value >= low) / len(held) if held else 0.0
+    return army + world.factions[faction_id].manpower * 0.25 * usable
 
 
 def _neighbouring_factions(world: WorldState, faction_id: int) -> list[int]:
@@ -119,6 +156,8 @@ def update_diplomacy(
     max_exhaustion: float = config["balance"]["war_declaration_max_exhaustion"]
     peace_exhaustion: float = config["balance"]["peace_exhaustion_threshold"]
     stalemate: int = config["balance"]["peace_stalemate_ticks"]
+    give_up: float = config["balance"]["capitulation_land_fraction"]
+    max_wars: int = config["balance"]["max_concurrent_wars"]
     events: list[dict[str, Any]] = eliminate_landless(world)
 
     for war_id in sorted(world.wars):
@@ -131,7 +170,10 @@ def update_diplomacy(
         destroyed = not any(not world.factions[f].eliminated for f in war.attackers) or not any(
             not world.factions[f].eliminated for f in war.defenders
         )
-        if not (worn_out or stalled or destroyed):
+        capitulated = _capitulated(world, war, war.attackers, give_up) or _capitulated(
+            world, war, war.defenders, give_up
+        )
+        if not (worn_out or stalled or destroyed or capitulated):
             continue
         war.status = "ended"
         for a in sorted(war.attackers):
@@ -142,20 +184,23 @@ def update_diplomacy(
             "kind": "peace",
             "attacker": sorted(war.attackers)[0],
             "defender": sorted(war.defenders)[0],
-            "reason": "elimination" if destroyed else "ceasefire",
+            "reason": "elimination" if destroyed else "capitulation" if capitulated else "ceasefire",
             "annexed": _settle(world, war),
         })
 
     for fid in sorted(world.factions):
         fac = world.factions[fid]
-        if fac.eliminated or fac.at_war_with or fac.exhaustion > max_exhaustion:
+        # Up to `max_concurrent_wars` at once: with one war per faction only
+        # about two of five factions ever acted (the user's observation).
+        if fac.eliminated or len(fac.at_war_with) >= max_wars or fac.exhaustion > max_exhaustion:
             continue
         if rng.random() > 0.004:
             continue
         candidates = [
             other for other in _neighbouring_factions(world, fid)
-            if not world.factions[other].at_war_with
-            and _strength(world, fid) > _strength(world, other) * ratio_needed
+            if other not in fac.at_war_with
+            and not world.factions[other].eliminated
+            and _strength(world, fid, config) > _strength(world, other, config) * ratio_needed
         ]
         if not candidates:
             continue
@@ -168,6 +213,10 @@ def update_diplomacy(
             defenders={target},
             started_at=world.current_time,
             last_capture_tick=world.tick_count,
+            start_land={
+                f: sum(1 for p in world.provinces.values() if p.controller_faction_id == f)
+                for f in (fid, target)
+            },
         )
         world.next_war_id += 1
         events.append({"kind": "war_declared", "attacker": fid, "defender": target})

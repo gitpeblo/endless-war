@@ -186,11 +186,28 @@ def test_a_broken_stack_does_not_deter_an_attack() -> None:
     w.armies[1] = Army(id=1, faction_id=0, province_id=border, manpower=20_000)
     w.armies[2] = Army(id=2, faction_id=3, province_id=target, manpower=150_000,
                        organization=0.0, morale=0.0)
+    w.provinces[target].garrison = 0.0  # isolate the stack from the province's own garrison
     choose_strategic_actions(w, random.Random(1), cfg)
     assert w.armies[1].destination_id == target
 
 
-def test_an_empty_hostile_province_is_always_attackable() -> None:
+def test_a_province_with_a_broken_garrison_is_attackable() -> None:
+    # Land now defends itself (garrisons); once its garrison is broken and no
+    # army holds it, even a small army will take it.
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    border = next(p for p in sorted(w.provinces) if w.provinces[p].controller_faction_id == 0
+                  and any(w.provinces[n].controller_faction_id == 3 for n in w.provinces[p].neighbors))
+    for n in w.provinces[border].neighbors:
+        if w.provinces[n].controller_faction_id == 3:
+            w.provinces[n].garrison = 0.0
+    w.armies[1] = Army(id=1, faction_id=0, province_id=border, manpower=500)
+    choose_strategic_actions(w, random.Random(1), cfg)
+    assert w.provinces[w.armies[1].destination_id].controller_faction_id == 3
+
+
+def test_a_garrison_deters_an_army_too_weak_to_break_it() -> None:
     from endless_war.domain.models import Army
     w, cfg = _war_world()
     w.armies.clear()
@@ -198,7 +215,7 @@ def test_an_empty_hostile_province_is_always_attackable() -> None:
                   and any(w.provinces[n].controller_faction_id == 3 for n in w.provinces[p].neighbors))
     w.armies[1] = Army(id=1, faction_id=0, province_id=border, manpower=500)
     choose_strategic_actions(w, random.Random(1), cfg)
-    assert w.provinces[w.armies[1].destination_id].controller_faction_id == 3
+    assert w.armies[1].destination_id is None or w.provinces[w.armies[1].destination_id].controller_faction_id == 0
 
 
 def test_an_army_holds_a_province_it_is_occupying_until_it_falls() -> None:
@@ -252,6 +269,30 @@ def test_a_beatable_enemy_army_is_engaged_before_empty_land() -> None:
     )
     enemy = sorted(n for n in w.provinces[here].neighbors if w.provinces[n].controller_faction_id == 3)
     w.armies[1] = Army(id=1, faction_id=0, province_id=here, manpower=30_000)
+    for n in enemy:
+        w.provinces[n].garrison = 0.0  # empty land here means land with no garrison either
     w.armies[2] = Army(id=2, faction_id=3, province_id=enemy[-1], manpower=10_000)
     choose_strategic_actions(w, random.Random(1), cfg)
     assert w.armies[1].destination_id == enemy[-1], "should fight the army, not walk into empty land"
+
+
+def test_a_broken_army_on_unsupplied_ground_falls_back_to_supply() -> None:
+    # At seed 99 three armies sat for years at organization 0 on unsupplied
+    # ground: too disorganized to move, unable to recover where they stood.
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    low = cfg["balance"]["low_supply_threshold"]
+    rear = _rear_province(w, 0, 3)
+    for p in w.provinces.values():
+        if p.controller_faction_id == 0:
+            p.supply_value = cfg["balance"]["min_supply"]
+    supplied = next(n for n in w.provinces[rear].neighbors if w.provinces[n].controller_faction_id == 0)
+    w.provinces[supplied].supply_value = 1.0
+    w.armies[1] = Army(id=1, faction_id=0, province_id=rear, manpower=20_000,
+                       organization=0.0, morale=0.0, supply=cfg["balance"]["min_supply"])
+    choose_strategic_actions(w, random.Random(1), cfg)
+    assert w.armies[1].destination_id == supplied
+    update_movement(w, random.Random(1), cfg)
+    assert w.armies[1].province_id == supplied, "a disorganized army may still fall back to supply"
+    assert w.provinces[supplied].supply_value >= low

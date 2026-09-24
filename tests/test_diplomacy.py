@@ -103,7 +103,10 @@ def test_exhaustion_does_not_grow_without_new_casualties() -> None:
     after_first = fac.exhaustion
     for _ in range(100):
         update_exhaustion(w, random.Random(1), cfg)
-    assert fac.exhaustion == after_first, "standing casualties must not keep raising exhaustion"
+    # Only war weariness (deliberate, time-based) may grow it now; the standing
+    # casualties must not be counted again.
+    weariness = cfg["balance"]["war_weariness_per_tick"]
+    assert abs(fac.exhaustion - (after_first + 100 * weariness)) < 1e-9, "standing casualties must not keep raising exhaustion"
 
 
 def test_casualties_from_a_previous_war_do_not_carry_into_the_next() -> None:
@@ -119,7 +122,8 @@ def test_casualties_from_a_previous_war_do_not_carry_into_the_next() -> None:
     assert fac.exhaustion == 0.0
     fac.at_war_with = {2}
     update_exhaustion(w, random.Random(1), cfg)
-    assert fac.exhaustion == 0.0, "a new war must start with no inherited exhaustion"
+    # One tick of war weariness is expected; nothing inherited from the old war.
+    assert abs(fac.exhaustion - cfg["balance"]["war_weariness_per_tick"]) < 1e-9, "a new war must start with no inherited exhaustion"
 
 
 def test_a_capture_only_resets_the_stalemate_timer_of_its_own_war() -> None:
@@ -230,3 +234,38 @@ def test_land_still_disputed_with_its_owner_is_not_settled() -> None:
     w.provinces[pid].controller_faction_id = 3
     update_diplomacy(w, rng, cfg)
     assert w.provinces[pid].owner_faction_id == 1, "3 and 1 are still at war over it"
+
+
+def test_a_broken_army_does_not_make_a_faction_look_strong() -> None:
+    # Faction 0 at seed 99 sat for years with 88,000 men at zero organization;
+    # counted by headcount it looked too strong to attack, so no war came.
+    from endless_war.config import load_config as _load
+    from endless_war.simulation.systems.diplomacy import _strength
+    from endless_war.simulation.worldgen import generate_world as _gen
+
+    cfg = _load()
+    w = _gen(seed=42, config=cfg)
+    w.factions[0].manpower = 0  # isolate the armies from the reserve pool
+    healthy = _strength(w, 0, cfg)
+    for a in w.armies.values():
+        if a.faction_id == 0:
+            a.organization = 0.0
+            a.morale = 0.0
+    assert _strength(w, 0, cfg) < 0.5 * healthy
+
+
+def test_reserves_a_faction_cannot_supply_do_not_count() -> None:
+    # A rump state with no supply source kept its huge reserve pool on paper,
+    # so healthy neighbours never declared on it (seed 99).
+    from endless_war.config import load_config as _load
+    from endless_war.simulation.systems.diplomacy import _strength
+    from endless_war.simulation.worldgen import generate_world as _gen
+
+    cfg = _load()
+    w = _gen(seed=42, config=cfg)
+    w.factions[0].manpower = 300_000
+    supplied = _strength(w, 0, cfg)
+    for p in w.provinces.values():
+        if p.controller_faction_id == 0:
+            p.supply_value = cfg["balance"]["min_supply"]
+    assert _strength(w, 0, cfg) < supplied - 0.9 * 300_000 * 0.25

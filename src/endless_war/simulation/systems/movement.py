@@ -50,10 +50,18 @@ def update_movement(world: WorldState, rng: random.Random, config: dict[str, Any
         # and retreated because it had not recovered. See docs/decisions.md,
         # 2026-09-23, "the recovery rule".
         target_id = army.destination_id
+        # An army that cannot recover where it stands (no supply) may still
+        # fall back onto its own land, however disorganized; otherwise it sat
+        # at zero organization forever (seed 99, 2026-09-24).
+        falling_back = (
+            army.supply < low_supply
+            and target_id is not None
+            and world.provinces[target_id].controller_faction_id == army.faction_id
+        )
         advancing = (
             target_id is not None
             and target_id in here.neighbors
-            and army.organization >= min_advance_org
+            and (army.organization >= min_advance_org or falling_back)
         )
 
         if army.supply < low_supply:

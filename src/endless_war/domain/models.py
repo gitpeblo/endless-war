@@ -23,6 +23,7 @@ class Province:
     is_capital: bool = False
     # (occupying faction, ticks held) while a walk-in capture is under way.
     occupation: tuple[int, int] | None = None
+    garrison: float = -1.0  # below zero: not yet set, stands at its cap
 
 
 @dataclass(slots=True)
@@ -65,6 +66,7 @@ class War:
     started_at: datetime
     status: str = "active"
     last_capture_tick: int = 0
+    start_land: dict[int, int] = field(default_factory=dict)  # provinces per belligerent at declaration
 
 
 @dataclass(slots=True)
