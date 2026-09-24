@@ -16,11 +16,28 @@ def test_an_unknown_colour_key_falls_back_instead_of_raising() -> None:
 
 
 def test_components_stay_in_range() -> None:
-    for key in ("red", "blue", "green", "amber", "violet", "grey"):
+    for key in ("blue", "orange", "teal", "gold", "pink", "grey"):
         for component in faction_rgb(key):
             assert 0.0 <= component <= 1.0
-    for component in darken(faction_rgb("red")) + lighten(faction_rgb("red")):
+    for component in darken(faction_rgb("orange")) + lighten(faction_rgb("orange")):
         assert 0.0 <= component <= 1.0
+
+
+def test_faction_colours_are_the_validated_palette() -> None:
+    # Checked with the dataviz palette validator against the map background
+    # (#1c1f24); see docs/decisions.md, 2026-09-24. Change these only by
+    # re-running the validator.
+    expected = {
+        "blue": "#3987e5",
+        "orange": "#d95926",
+        "teal": "#199e70",
+        "gold": "#c98500",
+        "pink": "#d55181",
+    }
+    for key, code in expected.items():
+        want = tuple(int(code[i : i + 2], 16) / 255 for i in (1, 3, 5))
+        assert faction_rgb(key) == pytest.approx(want), key
+    assert FACTION_COLORS == list(expected)
 
 
 def test_darken_is_darker_and_lighten_is_lighter() -> None:

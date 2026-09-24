@@ -8,12 +8,21 @@ from __future__ import annotations
 
 RGB = tuple[float, float, float]
 
+def _hex(code: str) -> RGB:
+    return tuple(int(code[i : i + 2], 16) / 255 for i in (1, 3, 5))  # type: ignore[return-value]
+
+
+# Validated with the dataviz palette checker against the map background
+# (#1c1f24): lightness band, chroma floor, adjacent-pair colour-blind
+# separation, normal-vision floor and contrast all pass. No five colours can
+# pass all-pairs; the legend, the bound-faction outline and the chart's direct
+# labels are the secondary encoding. See docs/decisions.md, 2026-09-24.
 FACTION_RGB: dict[str, RGB] = {
-    "red": (0.78, 0.24, 0.24),
-    "blue": (0.24, 0.45, 0.78),
-    "green": (0.27, 0.62, 0.36),
-    "amber": (0.85, 0.62, 0.20),
-    "violet": (0.55, 0.36, 0.72),
+    "blue": _hex("#3987e5"),
+    "orange": _hex("#d95926"),
+    "teal": _hex("#199e70"),
+    "gold": _hex("#c98500"),
+    "pink": _hex("#d55181"),
     "grey": (0.45, 0.45, 0.45),
 }
 FALLBACK_KEY = "grey"

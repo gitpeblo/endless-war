@@ -13,7 +13,7 @@ def _cell() -> ProvinceCell:
         name="P000",
         owner_faction_id=1,
         controller_faction_id=2,
-        color_key="red",
+        color_key="blue",
         is_capital=False,
         is_contested=True,
         has_armies=True,

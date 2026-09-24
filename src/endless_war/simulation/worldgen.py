@@ -78,7 +78,7 @@ FACTION_NAMES: list[str] = [
     "Astaran Dominion",
     "Free Cities League",
 ]
-FACTION_COLORS: list[str] = ["red", "blue", "green", "amber", "violet"]
+FACTION_COLORS: list[str] = ["blue", "orange", "teal", "gold", "pink"]
 
 
 def _pick_capitals(world: WorldState, rng: random.Random, count: int, cols: int) -> list[int]:
