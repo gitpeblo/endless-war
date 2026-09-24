@@ -13,3 +13,7 @@ venv/
 
 # editable install metadata
 *.egg-info/
+
+# the user's raw asset downloads (Unity packages, .aseprite); the game uses
+# src/endless_war/ui/assets/ instead
+/assets/maps/

@@ -16,3 +16,6 @@ dev = ["pytest>=8"]
 pythonpath = ["src"]
 testpaths = ["tests"]
 markers = ["slow: runs many simulated years; about 6 seconds, not milliseconds"]
+
+[tool.setuptools.package-data]
+"endless_war.ui" = ["assets/*.png", "assets/*.md"]
