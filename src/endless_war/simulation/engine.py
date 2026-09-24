@@ -34,7 +34,7 @@ class SimulationEngine:
         self.rng = random.Random(world.seed)
         self.tick_hours: int = self.config["simulation"]["tick_hours"]
 
-    def tick(self, hours: int | None = None) -> None:
+    def tick(self, hours: int | None = None) -> dict[str, int]:
         """Advance the world by one strategic tick.
 
         Systems run in the fixed order from docs/architecture.md. Later tasks
@@ -61,6 +61,7 @@ class SimulationEngine:
         )
         record_history(self.world)
         # --- SYSTEM PIPELINE END ---
+        return {"battles": len(battle_records), "captures": len(capture_records)}
 
     def run(self, ticks: int) -> None:
         """Advance the world by `ticks` strategic ticks."""
