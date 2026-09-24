@@ -48,20 +48,32 @@ def apply_control_changes(
         if record["defender_broke"]:
             _retreat(world, record["province_id"], record["defender_faction"])
 
+    ticks_needed: int = config["balance"]["occupation_ticks"]
     for pid in sorted(world.provinces):
         province = world.provinces[pid]
         present = [a for a in armies_in(world, pid) if a.manpower > 0]
-        if not present:
-            continue
         occupiers = {a.faction_id for a in present}
+        current = province.controller_faction_id
         if len(occupiers) != 1:
+            province.occupation = None  # empty, or still contested
             continue
         occupier = next(iter(occupiers))
-        current = province.controller_faction_id
-        if occupier == current:
+        if occupier == current or (
+            current is not None and occupier not in world.factions[current].at_war_with
+        ):
+            province.occupation = None
             continue
-        if current is not None and occupier not in world.factions[current].at_war_with:
+        # A capture takes `occupation_ticks` of holding the province alone and
+        # uninterrupted; leaving or being contested resets it. Before this, an
+        # army walking in captured at once, so two armies trading an empty
+        # province produced 620 captures from 60 battles (seed 42).
+        held = 1
+        if province.occupation is not None and province.occupation[0] == occupier:
+            held = province.occupation[1] + 1
+        if held < ticks_needed:
+            province.occupation = (occupier, held)
             continue
+        province.occupation = None
         captures.append(
             {"province_id": pid, "from_faction": current, "to_faction": occupier}
         )

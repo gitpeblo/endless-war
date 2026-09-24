@@ -25,6 +25,9 @@ def test_lone_army_captures_an_undefended_hostile_province() -> None:
     w.factions[3].at_war_with = {0}
     target = _border_province(w, 3, 0)
     w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
+    # Capture now takes occupation_ticks of uninterrupted holding.
+    for _ in range(cfg["balance"]["occupation_ticks"] - 1):
+        assert apply_control_changes(w, random.Random(1), cfg, []) == []
     captures = apply_control_changes(w, random.Random(1), cfg, [])
     assert w.provinces[target].controller_faction_id == 0
     assert captures == [{"province_id": target, "from_faction": 3, "to_faction": 0}]
@@ -38,7 +41,9 @@ def test_owner_is_unchanged_by_occupation() -> None:
     w.factions[3].at_war_with = {0}
     target = _border_province(w, 3, 0)
     w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
-    apply_control_changes(w, random.Random(1), cfg, [])
+    for _ in range(cfg["balance"]["occupation_ticks"]):
+        apply_control_changes(w, random.Random(1), cfg, [])
+    assert w.provinces[target].controller_faction_id == 0, "premise: it was captured"
     assert w.provinces[target].owner_faction_id == 3, "occupation must not transfer ownership"
 
 
@@ -157,3 +162,28 @@ def test_an_encircled_army_in_good_order_does_not_surrender() -> None:
     w.armies[1] = Army(id=1, faction_id=3, province_id=target, manpower=10_000)
     w.armies[2] = Army(id=2, faction_id=0, province_id=target, manpower=30_000)
     assert surrender_trapped_armies(w, cfg) == [] and 1 in w.armies
+
+
+def test_walking_in_and_out_captures_nothing() -> None:
+    # Capture churn: armies trading an empty province every other tick made
+    # 620 captures from 60 battles at seed 42. A hold must last a full day.
+    cfg = load_config()
+    w = _war(cfg)
+    target = _border_province(w, 3, 0)
+    home = next(n for n in w.provinces[target].neighbors if w.provinces[n].controller_faction_id == 0)
+    w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
+    for _ in range(3 * cfg["balance"]["occupation_ticks"]):
+        assert apply_control_changes(w, random.Random(1), cfg, []) == []
+        w.armies[0].province_id = home if w.armies[0].province_id == target else target
+    assert w.provinces[target].controller_faction_id == 3
+
+
+def test_a_contested_province_never_advances_occupation() -> None:
+    cfg = load_config()
+    w = _war(cfg)
+    target = _border_province(w, 3, 0)
+    w.armies[0] = Army(id=0, faction_id=0, province_id=target, manpower=30_000)
+    w.armies[1] = Army(id=1, faction_id=3, province_id=target, manpower=5_000)
+    for _ in range(3 * cfg["balance"]["occupation_ticks"]):
+        assert apply_control_changes(w, random.Random(1), cfg, []) == []
+    assert w.provinces[target].occupation is None

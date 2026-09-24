@@ -21,6 +21,8 @@ class Province:
     terrain: str = "plains"
     supply_value: float = 1.0
     is_capital: bool = False
+    # (occupying faction, ticks held) while a walk-in capture is under way.
+    occupation: tuple[int, int] | None = None
 
 
 @dataclass(slots=True)

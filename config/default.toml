@@ -35,6 +35,10 @@ broken_organization = 0.30
 broken_morale = 0.25
 attack_strength_ratio = 1.2
 min_advance_organization = 0.15
+# Ticks an army must hold an undefended hostile province, alone and
+# uninterrupted, before control changes. Stops capture churn (armies trading
+# an empty province every other tick). 4 ticks = one simulated day.
+occupation_ticks = 4
 low_supply_threshold = 0.35
 significant_battle_losses = 2000
 
