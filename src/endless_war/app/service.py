@@ -127,6 +127,8 @@ class SimulationService:
             bound_faction_id=self._bound_faction_id,
             speed=self._speed,
             fault_message=self._fault_message,
+            # Only this thread assigns `_view`, so reading it without the lock is safe.
+            previous=self._view,
         )
         with self._view_lock:
             self._view = view

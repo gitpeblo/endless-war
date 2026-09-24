@@ -121,3 +121,86 @@ def test_speed_and_fault_are_carried_through() -> None:
     assert ok.speed == "16x" and ok.faulted is False and ok.fault_message is None
     bad = build_view(world, cfg, bound_faction_id=None, speed="paused", fault_message="boom")
     assert bad.faulted is True and bad.fault_message == "boom"
+
+
+import dataclasses  # noqa: E402
+
+from endless_war.app.view_model import CasualtyReading, EventLine  # noqa: E402
+
+
+def _ticked(ticks: int):
+    cfg = load_config()
+    world = generate_world(seed=42, config=cfg)
+    engine = SimulationEngine(world, cfg)
+    engine.run(ticks)
+    return engine, world, cfg
+
+
+def _until_events(engine, world, count: int) -> None:
+    for _ in range(4 * 365):
+        if len(world.events) > count:
+            return
+        engine.tick()
+
+
+def test_the_view_carries_the_casualty_series_oldest_first() -> None:
+    engine, world, cfg = _ticked(40)
+    view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    assert isinstance(view.casualty_history, tuple)
+    assert view.casualty_history == tuple(world.casualty_history)
+    assert all(isinstance(r, CasualtyReading) for r in view.casualty_history)
+    engine.run(8)
+    assert len(view.casualty_history) < len(world.casualty_history), (
+        "the view must not follow the live list"
+    )
+
+
+def test_the_view_carries_the_whole_event_log() -> None:
+    engine, world, cfg = _ticked(0)
+    _until_events(engine, world, 20)
+    assert len(world.events) > 20, "premise: more events than the recent strip holds"
+    view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    assert len(view.event_log) == len(world.events)
+    assert [line.id for line in view.event_log] == [e.id for e in world.events]
+    assert all(isinstance(line, EventLine) for line in view.event_log)
+    assert view.recent_events == view.event_log[-len(view.recent_events):]
+
+
+def test_reusing_the_previous_view_matches_a_full_rebuild() -> None:
+    engine, world, cfg = _ticked(0)
+    _until_events(engine, world, 5)
+    first = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    engine.run(4 * 60)
+    reused = build_view(world, cfg, bound_faction_id=None, speed="1x", previous=first)
+    fresh = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    assert len(fresh.event_log) > len(first.event_log), "premise: new events arrived"
+    assert reused.event_log == fresh.event_log
+
+
+def test_reuse_is_correct_at_the_cap_when_old_events_are_evicted() -> None:
+    engine, world, cfg = _ticked(0)
+    _until_events(engine, world, 5)
+    first = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    # Emulate the cap: evict the three oldest, append two new, as record_events does.
+    for _ in range(3):
+        world.events.popleft()
+    for _ in range(2):
+        world.events.append(dataclasses.replace(world.events[-1], id=world.next_event_id))
+        world.next_event_id += 1
+    reused = build_view(world, cfg, bound_faction_id=None, speed="1x", previous=first)
+    fresh = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    assert reused.event_log == fresh.event_log
+    assert [line.id for line in reused.event_log] == [e.id for e in world.events]
+
+
+def test_reuse_survives_every_old_line_being_evicted() -> None:
+    engine, world, cfg = _ticked(0)
+    _until_events(engine, world, 5)
+    first = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    template = world.events[-1]
+    world.events.clear()
+    for _ in range(4):
+        world.events.append(dataclasses.replace(template, id=world.next_event_id))
+        world.next_event_id += 1
+    reused = build_view(world, cfg, bound_faction_id=None, speed="1x", previous=first)
+    assert [line.id for line in reused.event_log] == [e.id for e in world.events]

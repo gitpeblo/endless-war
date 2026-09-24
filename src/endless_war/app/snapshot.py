@@ -81,19 +81,38 @@ def _faction_rows(world: WorldState) -> tuple[FactionRow, ...]:
     return tuple(rows)
 
 
-def _recent_events(world: WorldState) -> tuple[EventLine, ...]:
-    window = list(world.events)[-RECENT_EVENT_LIMIT:]
-    return tuple(
-        EventLine(
-            id=event.id,
-            simulated_at=event.simulated_at,
-            category=event.category,
-            severity=event.severity,
-            title=event.title,
-            body=event.body,
-        )
-        for event in window
+def _event_line(event) -> EventLine:
+    return EventLine(
+        id=event.id,
+        simulated_at=event.simulated_at,
+        category=event.category,
+        severity=event.severity,
+        title=event.title,
+        body=event.body,
     )
+
+
+def _event_log(world: WorldState, previous: WorldView | None) -> tuple[EventLine, ...]:
+    """Every event, oldest first, reusing `previous`'s lines where it can.
+
+    Converting 2000 events costs ~1.5 ms, too much to do every tick. Event ids
+    are consecutive and `record_events` evicts only from the left, so the lines
+    still present are a slice of the previous log and only events after its
+    last id are new.
+    """
+    events = world.events
+    if not events:
+        return ()
+    old = previous.event_log if previous is not None else ()
+    first_id, last_id = events[0].id, events[-1].id
+    if not old or old[0].id > first_id or old[-1].id > last_id:
+        return tuple(_event_line(e) for e in events)
+    new_count = last_id - old[-1].id
+    if new_count >= len(events):
+        return tuple(_event_line(e) for e in events)
+    kept = old[first_id - old[0].id :]
+    fresh = tuple(_event_line(events[i]) for i in range(len(events) - new_count, len(events)))
+    return kept + fresh
 
 
 def build_view(
@@ -103,8 +122,14 @@ def build_view(
     bound_faction_id: int | None,
     speed: str,
     fault_message: str | None = None,
+    previous: WorldView | None = None,
 ) -> WorldView:
-    """Snapshot `world`. The result shares no mutable object with it."""
+    """Snapshot `world`. The result shares no mutable object with it.
+
+    `previous`, if given, must be an earlier view of the same world; its event
+    lines are reused rather than rebuilt.
+    """
+    event_log = _event_log(world, previous)
     return WorldView(
         simulated_at=world.current_time,
         tick_count=world.tick_count,
@@ -114,7 +139,9 @@ def build_view(
         bound_faction_id=bound_faction_id,
         provinces=_province_cells(world, config["balance"]["low_supply_threshold"]),
         factions=_faction_rows(world),
-        recent_events=_recent_events(world),
+        recent_events=event_log[-RECENT_EVENT_LIMIT:],
         active_wars=sum(1 for w in world.wars.values() if w.status == "active"),
         total_wars=len(world.wars),
+        casualty_history=tuple(world.casualty_history),
+        event_log=event_log,
     )

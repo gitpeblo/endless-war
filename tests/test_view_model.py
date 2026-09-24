@@ -40,6 +40,8 @@ def test_a_world_view_cannot_be_mutated() -> None:
         recent_events=(),
         active_wars=0,
         total_wars=0,
+        casualty_history=(),
+        event_log=(),
     )
     with pytest.raises(dataclasses.FrozenInstanceError):
         view.tick_count = 5
@@ -82,6 +84,8 @@ def test_collections_on_a_view_are_tuples_not_lists() -> None:
         ),
         active_wars=1,
         total_wars=1,
+        casualty_history=(),
+        event_log=(),
     )
     assert isinstance(view.provinces, tuple)
     assert isinstance(view.factions, tuple)

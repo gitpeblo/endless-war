@@ -10,6 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+# Re-exported so ui/ can import it from app/. It is frozen and built from
+# tuples, so sharing it with the live world breaks nothing above.
+from endless_war.domain.models import CasualtyReading  # noqa: F401
+
 
 @dataclass(frozen=True, slots=True)
 class ProvinceCell:
@@ -71,3 +75,5 @@ class WorldView:
     recent_events: tuple[EventLine, ...]
     active_wars: int
     total_wars: int
+    casualty_history: tuple[CasualtyReading, ...]
+    event_log: tuple[EventLine, ...]
