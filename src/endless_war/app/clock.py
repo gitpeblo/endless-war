@@ -13,7 +13,11 @@ SPEEDS: dict[str, float] = {
     "1x": 1.0,
     "4x": 4.0,
     "16x": 16.0,
+    "32x": 32.0,
+    "64x": 64.0,
 }
+# The speeds a control offers, slowest first; Pause is its own control.
+RUNNING_SPEEDS: tuple[str, ...] = tuple(s for s in SPEEDS if s != "paused")
 
 
 def seconds_per_tick(speed: str, live_tick_seconds: float) -> float | None:

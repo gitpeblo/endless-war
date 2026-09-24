@@ -18,7 +18,7 @@ The application should be divided into:
 
 The frozen view model (`WorldView`, `ProvinceCell`, `FactionRow`, `EventLine`) is built fresh from world state after every tick. A consumer sees a plain-value snapshot, never a live simulation object, so the GTK thread may read a view while the simulation thread mutates state, without a lock and without risk of a UI handler reaching back into the world.
 
-Speeds are `paused`, `1x` (from `config/default.toml`'s `live_tick_seconds`), `4x`, and `16x`. Catch-up when the service wakes from a stall is capped at `max_catchup_ticks_per_wake`; this prevents the world from simulating a week at once on a laptop wake.
+Speeds are `paused`, `1x` (from `config/default.toml`'s `live_tick_seconds`), `4x`, `16x`, `32x` and `64x`; `clock.RUNNING_SPEEDS` is the list the window's buttons and the tray's Speed menu offer. Catch-up when the service wakes from a stall is capped at `max_catchup_ticks_per_wake`; this prevents the world from simulating a week at once on a laptop wake.
 
 A tick that raises, or a command that fails to apply, sets a fault message and publishes a view flagged as faulted; a faulted service stops ticking and cannot recover within the process lifetime. Offline catch-up across restarts is not provided by this layer — it requires knowledge of when the process last stopped, which is a persistence-layer responsibility.
 

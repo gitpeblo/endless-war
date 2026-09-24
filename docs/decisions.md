@@ -466,3 +466,18 @@ The casualty series is recorded by the simulation (`systems/history.py`, one fro
 - `build_view(previous=...)` must be given a view of the same world; only `SimulationService` passes it.
 - Readings are never downsampled. A century is ~36,500 readings; the chart strokes at most one per horizontal pixel.
 - Coincident series (two factions with equal mutual losses) draw on top of each other; the later faction's line shows, and the hover tooltip gives exact values. Their direct labels are spread apart and kept inside the widget.
+
+## 2026-09-24 — Speeds extended to 32x and 64x
+
+**Decision:**
+Two speeds were added above 16x, at the user's request: `32x` and `64x`. `clock.RUNNING_SPEEDS` is now the single list both the toolbar and the tray menu read.
+
+**Reason:**
+- A decade at 16x takes about 23 minutes of wall-clock time; at 64x it takes under 6.
+- Measured at 64x on this machine: exactly 64 ticks/s (16 simulated days per second), 12.5% of one core, no fault. The service polls every 20 ms, so each wake runs one or two ticks, far below `max_catchup_ticks_per_wake`.
+
+**Alternatives considered:**
+- *64x only.* Rejected by the user in favour of a denser ladder (1x 4x 16x 32x 64x).
+
+**Consequences:**
+- The earlier 2026-09-23 entry's "four discrete speeds" is superseded: there are now six, including `paused`.

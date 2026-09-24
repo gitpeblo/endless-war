@@ -227,3 +227,17 @@ def test_toggling_a_faction_sends_no_command() -> None:
         assert service.submitted == []
     finally:
         room.shutdown()
+
+
+def test_the_toolbar_and_tray_offer_every_running_speed() -> None:
+    service, cfg = _service()
+    room = WarRoom(service, cols=cfg["world"]["grid_cols"])
+    try:
+        labels = [b.get_label() for b in room.toolbar_buttons]
+        assert labels == ["1x", "4x", "16x", "32x", "64x", "Pause"]
+        speed_item = next(i for i in room.tray._menu.get_children() if i.get_label() == "Speed")
+        assert [i.get_label() for i in speed_item.get_submenu().get_children()] == [
+            "1x", "4x", "16x", "32x", "64x",
+        ]
+    finally:
+        room.shutdown()

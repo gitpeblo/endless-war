@@ -376,3 +376,14 @@ def test_a_failing_publish_surfaces_as_a_faulted_view_instead_of_a_silent_stall(
         assert service.is_running() is True, "a failing publish must not kill the thread"
     finally:
         service.stop()
+
+
+def test_the_service_accepts_64x() -> None:
+    service, clock, _world = _service(speed="64x")
+    service.start()
+    try:
+        assert _run_until(
+            service, lambda: service.latest_view().speed == "64x", clock, 0.0
+        )
+    finally:
+        service.stop()

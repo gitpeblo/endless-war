@@ -5,18 +5,22 @@ from endless_war.app.commands import BindFaction, Pause, Resume, SetSpeed, Shutd
 from endless_war.config import load_config
 
 
-def test_the_four_speeds_are_paused_1x_4x_16x() -> None:
-    assert sorted(SPEEDS) == sorted(["paused", "1x", "4x", "16x"])
+def test_the_speeds_run_from_paused_to_64x() -> None:
+    assert list(SPEEDS) == ["paused", "1x", "4x", "16x", "32x", "64x"]
     assert SPEEDS["paused"] == 0.0
     assert SPEEDS["1x"] == 1.0
     assert SPEEDS["4x"] == 4.0
     assert SPEEDS["16x"] == 16.0
+    assert SPEEDS["32x"] == 32.0
+    assert SPEEDS["64x"] == 64.0
 
 
 def test_a_faster_speed_means_less_time_per_tick() -> None:
     assert seconds_per_tick("1x", 1.0) == 1.0
     assert seconds_per_tick("4x", 1.0) == 0.25
     assert seconds_per_tick("16x", 1.0) == 0.0625
+    assert seconds_per_tick("32x", 1.0) == 0.03125
+    assert seconds_per_tick("64x", 1.0) == 0.015625
 
 
 def test_paused_has_no_tick_interval() -> None:

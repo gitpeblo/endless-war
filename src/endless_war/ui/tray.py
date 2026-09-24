@@ -16,6 +16,8 @@ gi.require_version("AyatanaAppIndicator3", "0.1")
 from gi.repository import AyatanaAppIndicator3 as AppIndicator  # noqa: E402
 from gi.repository import Gtk  # noqa: E402
 
+from endless_war.app.clock import RUNNING_SPEEDS  # noqa: E402
+
 INDICATOR_ID = "endless-war"
 
 
@@ -53,7 +55,7 @@ class Tray:
 
         speed_item = Gtk.MenuItem(label="Speed")
         speed_menu = Gtk.Menu()
-        for speed in ("1x", "4x", "16x"):
+        for speed in RUNNING_SPEEDS:
             entry = Gtk.MenuItem(label=speed)
             entry.connect("activate", lambda _i, s=speed: on_speed(s))
             speed_menu.append(entry)

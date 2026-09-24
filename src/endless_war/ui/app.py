@@ -16,6 +16,7 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import GLib, Gtk  # noqa: E402
 
+from endless_war.app.clock import RUNNING_SPEEDS  # noqa: E402
 from endless_war.app.commands import BindFaction, Pause, Resume, SetSpeed  # noqa: E402
 from endless_war.app.service import SimulationService  # noqa: E402
 from endless_war.config import load_config  # noqa: E402
@@ -57,7 +58,7 @@ class WarRoom:
         self.header = Gtk.Label(label="")
         self.header.set_xalign(0.0)
         bar.pack_start(self.header, True, True, 0)
-        for speed in ("1x", "4x", "16x"):
+        for speed in RUNNING_SPEEDS:
             button = Gtk.Button(label=speed)
             button.connect("clicked", lambda _b, s=speed: self._set_speed(s))
             bar.pack_start(button, False, False, 0)
