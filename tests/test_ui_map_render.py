@@ -140,7 +140,7 @@ def test_rendering_is_stable_for_the_same_view() -> None:
 
 def test_the_wash_lets_the_terrain_show_through() -> None:
     # The user asked for more transparency than the first 45 %.
-    assert map_view.WASH_ALPHA == 0.25
+    assert map_view.WASH_ALPHA == 0.10
 
 
 def test_a_capital_is_drawn_with_its_sprite() -> None:
@@ -173,3 +173,23 @@ def test_a_tank_is_never_covered_by_a_nearer_tile() -> None:
     ]
     assert len(tank) > 30, "premise: a tank is drawn"
     assert all(_pixel(flat, x, y) == _pixel(peak, x, y) for x, y in tank)
+
+
+def test_a_contour_runs_where_controllers_differ_and_not_inside() -> None:
+    view = _view()
+    board = board_for(96, COLS, WIDTH, HEIGHT)
+    s = board.scale
+
+    def edge_pixel(surface, a, b):
+        # The midpoint of the edge between cells a and b, nudged into a.
+        ax, ay = face_centre(board, a % COLS, a // COLS)
+        bx, by = face_centre(board, b % COLS, b // COLS)
+        mx, my = (ax + bx) / 2, (ay + by) / 2
+        return _pixel(surface, mx + (ax - mx) * 0.08, my + (ay - my) * 0.08)
+
+    same = _with(_with(_plain(_plain(view, 5), 6), 5, color_key="blue", controller_faction_id=0), 6, color_key="blue", controller_faction_id=0)
+    split = _with(same, 6, color_key="orange", controller_faction_id=1)
+    inside = edge_pixel(_render(same), 5, 6)
+    border = edge_pixel(_render(split), 5, 6)
+    blue = [round(c * 255) for c in faction_rgb("blue")]
+    assert sum(abs(p - q) for p, q in zip(border, blue)) < sum(abs(p - q) for p, q in zip(inside, blue)) - 60

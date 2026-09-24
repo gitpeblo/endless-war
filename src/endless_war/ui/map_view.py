@@ -30,7 +30,7 @@ from endless_war.ui.terrain import WATER, load_sheet, tile_for  # noqa: E402
 
 BACKGROUND = (0.11, 0.12, 0.14)
 HATCH_RGBA = (0.05, 0.05, 0.05, 0.55)
-WASH_ALPHA = 0.25  # lowered from 0.45, then 0.35, at the user's request: the land shows through
+WASH_ALPHA = 0.10  # a hint only (was 0.45, 0.35, 0.25): the faction contour carries ownership
 SUPPLY_ALPHA = 0.35
 
 
@@ -136,11 +136,53 @@ def _province(cr, sheet, province: ProvinceCell, x: float, y: float, s: float, b
         _wash(cr, x, y, s, (0.0, 0.0, 0.0), SUPPLY_ALPHA)
     if province.is_contested:
         _hatch(cr, x, y, s)
-    if bound is not None and province.controller_faction_id == bound:
-        _outline(cr, x, y, s, rgb)
     structure = structure_for(province)
     if structure is not None:
         _structure(cr, structure, x, y, s)
+
+
+# Each neighbour, and the edge of this cell's top face it shares: T, R, B, L
+# are the diamond's top, right, bottom and left vertices.
+_EDGES = (((0, -1), "T", "R"), ((1, 0), "R", "B"), ((0, 1), "B", "L"), ((-1, 0), "L", "T"))
+
+
+def _vertices(x: float, y: float, s: float, inset: float) -> dict[str, tuple[float, float]]:
+    cx, top = x + iso.FACE_W / 2 * s, y + iso.FACE_TOP * s
+    half_h = iso.FACE_H / 2 * s
+    return {
+        "T": (cx, top + inset),
+        "R": (x + iso.FACE_W * s - 2 * inset, top + half_h),
+        "B": (cx, top + 2 * half_h - inset),
+        "L": (x + 2 * inset, top + half_h),
+    }
+
+
+def _contours(cr, board, by_cell, bound: int | None) -> None:
+    """A thin line in each faction's colour along its land's outer edge.
+
+    Drawn just inside each province's top face wherever the neighbour has a
+    different controller (or is sea), so two factions' lines run side by side
+    along a front. The bound faction's line is thicker and lighter.
+    """
+    s = board.scale
+    cr.save()
+    cr.set_line_cap(cairo.LINE_CAP_ROUND)
+    for (col, row), province in sorted(by_cell.items(), key=lambda kv: (kv[0][0] + kv[0][1], kv[0][0])):
+        mine = province.controller_faction_id
+        yours = bound is not None and mine == bound
+        x, y = iso.tile_origin(board, col, row)
+        points = _vertices(x, y, s, inset=1.2 * s)
+        rgb = faction_rgb(province.color_key)
+        cr.set_source_rgb(*(lighten(rgb) if yours else rgb))
+        cr.set_line_width((2.2 if yours else 1.2) * s)
+        for (dc, dr), a, b in _EDGES:
+            other = by_cell.get((col + dc, row + dr))
+            if other is not None and other.controller_faction_id == mine:
+                continue
+            cr.move_to(*points[a])
+            cr.line_to(*points[b])
+        cr.stroke()
+    cr.restore()
 
 
 def render_map(
@@ -170,6 +212,7 @@ def render_map(
             _blit(cr, sheet, WATER, x, y + iso.WATER_DROP * s, s)
         else:
             _province(cr, sheet, province, x, y, s, view.bound_faction_id)
+    _contours(cr, board, by_cell, view.bound_faction_id)
     # Armies go on top of the finished board, back to front, so no nearer
     # tile or tall terrain can cut a tank off.
     for col, row in iso.draw_order(board.cols, board.rows):

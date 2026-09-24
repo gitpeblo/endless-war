@@ -485,7 +485,7 @@ Two speeds were added above 16x, at the user's request: `32x` and `64x`. `clock.
 ## 2026-09-24 — Isometric pixel-art map: dark terrain under a faction wash
 
 **Decision:**
-The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tileset" (CC0 1.0, https://newc-42.itch.io/pixel-art-isometric-map-tileset), committed as `src/endless_war/ui/assets/terrain.png`. Terrain is the simulation's own (`Province.terrain`), drawn darkened and desaturated; each province is washed in its controller's colour at 25 % (first 45 %, then 35 %; lowered at the user's request so the land shows through). The map opens at the scale at which the land exactly fills its area (the sea ring may run off the edges), sampled nearest-neighbour; zoom steps above that are whole numbers.
+The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tileset" (CC0 1.0, https://newc-42.itch.io/pixel-art-isometric-map-tileset), committed as `src/endless_war/ui/assets/terrain.png`. Terrain is the simulation's own (`Province.terrain`), drawn darkened and desaturated; each province is washed in its controller's colour at only 10 % (first 45 %, then 35 %, 25 %; lowered at the user's request), with a thin contour in the faction's colour around its land carrying ownership; the bound faction's contour is thicker and lighter. The map opens at the scale at which the land exactly fills its area (the sea ring may run off the edges), sampled nearest-neighbour; zoom steps above that are whole numbers.
 
 **Reason:**
 - The user asked for 8-bit art that is serious rather than cartoonish, "grim and dark", and chose this pack. It is CC0, so it can live in the repo.
