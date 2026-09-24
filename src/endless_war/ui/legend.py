@@ -29,6 +29,7 @@ from endless_war.ui.map_view import (  # noqa: E402
     _face,
     _hatch,
     _outline,
+    _town,
     _wash,
 )
 from endless_war.ui.terrain import load_sheet, tile_for  # noqa: E402
@@ -48,7 +49,7 @@ TERRAIN_ORDER = ("plains", "forest", "hills", "mountain", "urban")
 
 @dataclass(frozen=True, slots=True)
 class LegendEntry:
-    kind: str  # faction | bound | contested | supply | capital | army | heading | terrain
+    kind: str  # faction | bound | contested | supply | capital | army | town | heading | terrain
     label: str
     color_key: str
     terrain: str = ""
@@ -65,6 +66,7 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
         LegendEntry("supply", "Supply problem", NEUTRAL_KEY),
         LegendEntry("capital", "Capital", NEUTRAL_KEY),
         LegendEntry("army", "Army present", NEUTRAL_KEY),
+        LegendEntry("town", "Town (urban province)", NEUTRAL_KEY),
         LegendEntry("heading", "Terrain", NEUTRAL_KEY),
     ]
     entries += [LegendEntry("terrain", t.capitalize(), NEUTRAL_KEY, t) for t in TERRAIN_ORDER]
@@ -114,6 +116,12 @@ def _symbol(cr, entry: LegendEntry, x: float, y: float) -> None:
         _capital(cr, x, y, s)
     elif entry.kind == "army":
         _army(cr, x, y, s)
+    elif entry.kind == "town":
+        # At the swatch's half size the glyph is a few pixels; draw it at
+        # full size, centred where a half-size marker would sit.
+        cx = x + iso.FACE_W / 2 * s
+        cy = y + (iso.FACE_TOP + iso.FACE_H / 2) * s
+        _town(cr, cx - iso.FACE_W / 2, cy - (iso.FACE_TOP + iso.FACE_H / 2), 1)
 
 
 def _thumbnail(cr, sheet, terrain: str, top: float) -> None:
@@ -122,6 +130,8 @@ def _thumbnail(cr, sheet, terrain: str, top: float) -> None:
     cr.rectangle(PAD, top, THUMB_W, TERRAIN_ROW)
     cr.clip()
     _blit(cr, sheet, tile_for(terrain, 0), PAD, top - 12, 1)
+    if terrain == "urban":
+        _town(cr, PAD, top - 12, 1)  # as the map draws it
     cr.restore()
 
 
