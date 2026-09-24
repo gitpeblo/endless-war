@@ -75,6 +75,7 @@ def _province(entry: LegendEntry) -> ProvinceCell:
         is_contested=False,
         has_armies=False,
         has_supply_problem=entry.kind == "supply",
+        terrain="plains",
     )
 
 

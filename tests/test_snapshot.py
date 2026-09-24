@@ -204,3 +204,12 @@ def test_reuse_survives_every_old_line_being_evicted() -> None:
         world.next_event_id += 1
     reused = build_view(world, cfg, bound_faction_id=None, speed="1x", previous=first)
     assert [line.id for line in reused.event_log] == [e.id for e in world.events]
+
+
+def test_every_province_carries_its_terrain() -> None:
+    world, cfg = _world()
+    view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    assert [c.terrain for c in view.provinces] == [
+        world.provinces[pid].terrain for pid in sorted(world.provinces)
+    ]
+    assert len({c.terrain for c in view.provinces}) > 1, "premise: seed 42 has varied terrain"

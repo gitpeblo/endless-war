@@ -28,6 +28,7 @@ class ProvinceCell:
     is_contested: bool
     has_armies: bool
     has_supply_problem: bool
+    terrain: str
 
 
 @dataclass(frozen=True, slots=True)

@@ -46,6 +46,7 @@ def _province_cells(
                 is_contested=contested,
                 has_armies=armies_here.get(pid, False),
                 has_supply_problem=province.supply_value < low_supply_threshold,
+                terrain=province.terrain,
             )
         )
     return tuple(cells)
