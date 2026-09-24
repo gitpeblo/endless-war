@@ -15,7 +15,7 @@ from gi.repository import Gtk  # noqa: E402
 from endless_war.app.view_model import WorldView  # noqa: E402
 from endless_war.ui.chart import CasualtyChart  # noqa: E402
 from endless_war.ui.colors import faction_rgb  # noqa: E402
-from endless_war.ui.panels import event_log_lines  # noqa: E402
+from endless_war.ui.panels import event_line  # noqa: E402
 
 SWATCH_PX = 12
 
@@ -50,9 +50,17 @@ class HistoryTab(Gtk.Box):
         self.chart = CasualtyChart()
         self.pack_start(self.chart, False, False, 0)
 
-        self.log = Gtk.Label(label="")
-        self.log.set_xalign(0.0)
-        self.log.set_yalign(0.0)
+        # A list view, not a Label: re-laying out one Label holding the whole
+        # log stalled the main loop by ~0.2-0.8 s per new event in long games.
+        # The view lays out only the rows on screen, and rows are added and
+        # removed one by one. Store order is newest first: (event id, line).
+        self._store = Gtk.ListStore(int, str)
+        self.log = Gtk.TreeView(model=self._store)
+        self.log.set_headers_visible(False)
+        column = Gtk.TreeViewColumn("Event", Gtk.CellRendererText(), text=1)
+        column.set_sizing(Gtk.TreeViewColumnSizing.FIXED)
+        self.log.append_column(column)
+        self.log.set_fixed_height_mode(True)
         scroller = Gtk.ScrolledWindow()
         scroller.add(self.log)
         self.pack_start(scroller, True, True, 0)
@@ -63,10 +71,37 @@ class HistoryTab(Gtk.Box):
                 self._add_toggle(faction.id, faction.name, faction.color_key)
         self.chart.set_data(view.casualty_history, view.factions)
         self.chart.set_visible(frozenset(self._visible))
-        newest = view.event_log[-1].id if view.event_log else None
-        if newest != self._newest_event_id:
-            self._newest_event_id = newest
-            self.log.set_text("\n".join(event_log_lines(view)))
+        self._update_log(view.event_log)
+
+    def log_lines(self) -> list[str]:
+        """The log as shown, newest first."""
+        return [row[1] for row in self._store]
+
+    def mark_oldest_row(self, text: str) -> None:
+        """Test hook: overwrite the bottom row's text, to prove it is kept."""
+        self._store[len(self._store) - 1][1] = text
+
+    def _update_log(self, events) -> None:
+        newest = events[-1].id if events else None
+        if newest == self._newest_event_id:
+            return  # evictions only ever accompany new events
+        store = self._store
+        shown_newest = self._newest_event_id
+        self._newest_event_id = newest
+        if newest is None or shown_newest is None or shown_newest > newest:
+            # Nothing shown yet, or a log that is not a continuation of it.
+            store.clear()
+            fresh = events
+        else:
+            count = newest - shown_newest
+            fresh = events[-count:] if count < len(events) else events
+            if count >= len(events):
+                store.clear()
+        oldest = events[0].id if events else None
+        while len(store) and store[len(store) - 1][0] < oldest:
+            store.remove(store.get_iter(len(store) - 1))
+        for event in fresh:
+            store.insert(0, [event.id, event_line(event)])
 
     def _add_toggle(self, faction_id: int, name: str, color_key: str) -> None:
         button = Gtk.CheckButton()

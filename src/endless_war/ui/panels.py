@@ -54,18 +54,19 @@ def status_rows(view: WorldView) -> list[tuple[str, str]]:
     return rows
 
 
-def _event_line(event) -> str:
+def event_line(event) -> str:
+    """One event as a dated line."""
     return f"{event.simulated_at.date().isoformat()}  {event.title}: {event.body}"
 
 
 def event_lines(view: WorldView) -> list[str]:
     """One line per recent event, oldest first."""
-    return [_event_line(event) for event in view.recent_events]
+    return [event_line(event) for event in view.recent_events]
 
 
 def event_log_lines(view: WorldView) -> list[str]:
     """One line per logged event, newest first."""
-    return [_event_line(event) for event in reversed(view.event_log)]
+    return [event_line(event) for event in reversed(view.event_log)]
 
 
 def tray_summary(view: WorldView) -> str:

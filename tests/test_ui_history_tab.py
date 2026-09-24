@@ -11,6 +11,7 @@ from endless_war.config import load_config  # noqa: E402
 from endless_war.simulation.engine import SimulationEngine  # noqa: E402
 from endless_war.simulation.worldgen import generate_world  # noqa: E402
 from endless_war.ui.history_tab import HistoryTab  # noqa: E402
+from endless_war.ui.panels import event_log_lines  # noqa: E402
 
 
 def _view_with_events():
@@ -61,23 +62,57 @@ def test_the_log_is_newest_first() -> None:
     *_, view = _view_with_events()
     tab = HistoryTab()
     tab.set_view(view)
+    lines = tab.log_lines()
+    assert lines == event_log_lines(view)
     newest = view.event_log[-1]
-    first = tab.log.get_text().splitlines()[0]
-    assert newest.title in first and newest.body in first
+    assert newest.title in lines[0] and newest.body in lines[0]
 
 
-def test_the_log_is_not_reset_when_no_new_event_arrived() -> None:
-    # Re-setting a Label's text every 250 ms would throw away the reader's
-    # scroll position, so the log only changes when the newest event does.
+def _advance_until_new_event(engine, world, view) -> None:
+    for _ in range(4 * 365):
+        if world.events[-1].id != view.event_log[-1].id:
+            return
+        engine.tick()
+    raise AssertionError("premise: a new event arrives within a year")
+
+
+def test_new_events_are_added_on_top_without_rebuilding_the_log() -> None:
+    # Re-laying out the whole log on every new event stalled the GTK main loop
+    # by ~0.2-0.8 s in long games (final review, measured). Rows already shown
+    # must survive an update; only new ones are added.
     engine, world, cfg, view = _view_with_events()
     tab = HistoryTab()
     tab.set_view(view)
-    tab.log.set_text("sentinel")
+    tab.mark_oldest_row("sentinel")
     tab.set_view(view)
-    assert tab.log.get_text() == "sentinel"
-    for _ in range(4 * 365):
-        if world.events[-1].id != view.event_log[-1].id:
-            break
-        engine.tick()
-    tab.set_view(build_view(world, cfg, bound_faction_id=None, speed="1x"))
-    assert tab.log.get_text() != "sentinel"
+    assert tab.log_lines()[-1] == "sentinel", "no new event: nothing may change"
+    _advance_until_new_event(engine, world, view)
+    later = build_view(world, cfg, bound_faction_id=None, speed="1x", previous=view)
+    tab.set_view(later)
+    lines = tab.log_lines()
+    assert lines[-1] == "sentinel", "the log was rebuilt instead of updated"
+    assert lines[:-1] == event_log_lines(later)[:-1]
+
+
+def test_evicted_events_leave_the_bottom_of_the_log() -> None:
+    engine, world, cfg, view = _view_with_events()
+    tab = HistoryTab()
+    tab.set_view(view)
+    # Emulate the 2000-entry cap: the oldest two go, one new arrives.
+    world.events.popleft()
+    world.events.popleft()
+    world.events.append(dataclasses.replace(world.events[-1], id=world.next_event_id))
+    world.next_event_id += 1
+    later = build_view(world, cfg, bound_faction_id=None, speed="1x", previous=view)
+    tab.set_view(later)
+    assert tab.log_lines() == event_log_lines(later)
+
+
+def test_a_log_from_a_different_run_replaces_the_old_one() -> None:
+    *_, view = _view_with_events()
+    tab = HistoryTab()
+    tab.set_view(view)
+    fresh = build_view(generate_world(seed=7, config=load_config()), load_config(),
+                       bound_faction_id=None, speed="1x")
+    tab.set_view(fresh)
+    assert tab.log_lines() == event_log_lines(fresh)
