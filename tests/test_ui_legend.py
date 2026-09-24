@@ -119,20 +119,20 @@ def test_the_supply_and_occupied_swatches_are_visible_on_their_ground() -> None:
             assert sum(_px(surface, x + 4.5, y + 2)) < ground - 10, "army dot not visible"
 
 
-def test_the_town_marker_is_explained_and_drawn() -> None:
-    # The user saw the three-building glyph on the map and could not find it
-    # in the legend.
+def test_every_structure_is_explained_with_its_sprite() -> None:
+    # The user saw the town marker on the map and could not find it in the
+    # legend; capitals, industry and towns are now sprites, each with a row.
     view = _view()
     entries = legend_entries(view)
     kinds = [e.kind for e in entries]
-    assert "town" in kinds
-    assert kinds.index("town") < kinds.index("heading"), "a symbol, listed before the terrains"
     surface = _render(view)
-    index = kinds.index("town")
-    x, y = swatch_centre(entries, index)
-    ground = sum(round(c * 255) for c in GROUND_RGB)
-    dark = sum(
-        1 for dx in range(-4, 5) for dy in range(-3, 2)
-        if sum(_px(surface, x + dx, y + dy)) < ground - 30
-    )
-    assert dark > 5, "no town glyph on the swatch"
+    background = (28, 31, 36)
+    for kind in ("capital", "industry", "town"):
+        assert kind in kinds and kinds.index(kind) < kinds.index("heading"), kind
+        index = kinds.index(kind)
+        top = PAD + sum(row_height(e) for e in entries[:index])
+        drawn = sum(
+            1 for dx in range(PAD, PAD + 48) for dy in range(top, top + row_height(entries[index]))
+            if _px(surface, dx, dy) != background
+        )
+        assert drawn > 80, f"no {kind} sprite drawn"

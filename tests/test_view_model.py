@@ -19,6 +19,7 @@ def _cell() -> ProvinceCell:
         has_armies=True,
         has_supply_problem=False,
         terrain="plains",
+        is_industrial=False,
     )
 
 

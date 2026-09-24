@@ -49,7 +49,11 @@ def _with(view, pid: int, **changes):
 
 
 def _plain(view, pid: int):
-    return _with(view, pid, is_contested=False, has_supply_problem=False, has_armies=False, is_capital=False)
+    # A bare tile: no markers and no structure sprite over the probe points.
+    return _with(
+        view, pid, is_contested=False, has_supply_problem=False, has_armies=False,
+        is_capital=False, is_industrial=False, terrain="plains",
+    )
 
 
 def test_the_wash_is_the_provinces_faction_colour(monkeypatch) -> None:
@@ -137,3 +141,19 @@ def test_rendering_is_stable_for_the_same_view() -> None:
 def test_the_wash_lets_the_terrain_show_through() -> None:
     # The user asked for more transparency than the first 45 %.
     assert map_view.WASH_ALPHA == 0.35
+
+
+def test_a_capital_is_drawn_with_its_sprite() -> None:
+    view = _plain(_view(), 5)
+    view = _with(view, 5, terrain="plains", is_industrial=False)
+    board = board_for(96, COLS, WIDTH, HEIGHT)
+    cx, cy = face_centre(board, 5, 0)
+    plain = _render(view)
+    capital = _render(_with(view, 5, is_capital=True))
+    changed = sum(
+        1
+        for dx in range(-12, 13)
+        for dy in range(-18, 4)
+        if _pixel(plain, cx + dx, cy + dy) != _pixel(capital, cx + dx, cy + dy)
+    )
+    assert changed > 60, "no capital building drawn on the province"

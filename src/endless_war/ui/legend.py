@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -25,13 +26,12 @@ from endless_war.ui.map_view import (  # noqa: E402
     WASH_ALPHA,
     _army,
     _blit,
-    _capital,
     _face,
     _hatch,
     _outline,
-    _town,
     _wash,
 )
+from endless_war.ui.structures import SPRITE_SIZE, load_structure  # noqa: E402
 from endless_war.ui.terrain import load_sheet, tile_for  # noqa: E402
 
 PAD = 8
@@ -49,7 +49,7 @@ TERRAIN_ORDER = ("plains", "forest", "hills", "mountain", "urban")
 
 @dataclass(frozen=True, slots=True)
 class LegendEntry:
-    kind: str  # faction | bound | contested | supply | capital | army | town | heading | terrain
+    kind: str  # faction | bound | contested | supply | army | capital | industry | town | heading | terrain
     label: str
     color_key: str
     terrain: str = ""
@@ -64,8 +64,9 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
     entries += [
         LegendEntry("contested", "Occupied or under attack", NEUTRAL_KEY),
         LegendEntry("supply", "Supply problem", NEUTRAL_KEY),
-        LegendEntry("capital", "Capital", NEUTRAL_KEY),
         LegendEntry("army", "Army present", NEUTRAL_KEY),
+        LegendEntry("capital", "Capital (supply source)", NEUTRAL_KEY),
+        LegendEntry("industry", "Industry (supply source)", NEUTRAL_KEY),
         LegendEntry("town", "Town (urban province)", NEUTRAL_KEY),
         LegendEntry("heading", "Terrain", NEUTRAL_KEY),
     ]
@@ -73,8 +74,11 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
     return entries
 
 
+STRUCTURE_KINDS = ("capital", "industry", "town")
+
+
 def row_height(entry: LegendEntry) -> int:
-    return TERRAIN_ROW if entry.kind == "terrain" else ROW
+    return TERRAIN_ROW if entry.kind == "terrain" or entry.kind in STRUCTURE_KINDS else ROW
 
 
 def legend_height(view: WorldView) -> int:
@@ -112,16 +116,9 @@ def _symbol(cr, entry: LegendEntry, x: float, y: float) -> None:
         _hatch(cr, x, y, s)
     elif entry.kind == "supply":
         _wash(cr, x, y, s, (0.0, 0.0, 0.0), SUPPLY_ALPHA)
-    elif entry.kind == "capital":
-        _capital(cr, x, y, s)
     elif entry.kind == "army":
         _army(cr, x, y, s)
-    elif entry.kind == "town":
-        # At the swatch's half size the glyph is a few pixels; draw it at
-        # full size, centred where a half-size marker would sit.
-        cx = x + iso.FACE_W / 2 * s
-        cy = y + (iso.FACE_TOP + iso.FACE_H / 2) * s
-        _town(cr, cx - iso.FACE_W / 2, cy - (iso.FACE_TOP + iso.FACE_H / 2), 1)
+
 
 
 def _thumbnail(cr, sheet, terrain: str, top: float) -> None:
@@ -130,8 +127,17 @@ def _thumbnail(cr, sheet, terrain: str, top: float) -> None:
     cr.rectangle(PAD, top, THUMB_W, TERRAIN_ROW)
     cr.clip()
     _blit(cr, sheet, tile_for(terrain, 0), PAD, top - 12, 1)
-    if terrain == "urban":
-        _town(cr, PAD, top - 12, 1)  # as the map draws it
+    cr.restore()
+
+
+def _sprite(cr, name: str, top: float) -> None:
+    # The sprite as the map draws it at scale 1, clipped to the row.
+    cr.save()
+    cr.rectangle(PAD, top, THUMB_W, TERRAIN_ROW)
+    cr.clip()
+    cr.set_source_surface(load_structure(name), PAD + (THUMB_W - SPRITE_SIZE) / 2, top - 1)
+    cr.get_source().set_filter(cairo.FILTER_NEAREST)
+    cr.paint()
     cr.restore()
 
 
@@ -150,6 +156,8 @@ def render_legend(cr, view: WorldView, width: float, height: float) -> None:
         h = row_height(entry)
         if entry.kind == "terrain":
             _thumbnail(cr, sheet, entry.terrain, top)
+        elif entry.kind in STRUCTURE_KINDS:
+            _sprite(cr, entry.kind, top)
         elif entry.kind != "heading":
             _symbol(cr, entry, *_swatch_origin(entries, index))
         cr.set_source_rgb(*(HEADING_RGB if entry.kind == "heading" else TEXT_RGB))

@@ -19,13 +19,12 @@ from gi.repository import Gdk, Gtk  # noqa: E402
 from endless_war.app.view_model import ProvinceCell, WorldView  # noqa: E402
 from endless_war.ui import iso  # noqa: E402
 from endless_war.ui.colors import faction_rgb, lighten  # noqa: E402
+from endless_war.ui.structures import ANCHOR, load_structure, structure_for  # noqa: E402
 from endless_war.ui.terrain import WATER, load_sheet, tile_for  # noqa: E402
 
 BACKGROUND = (0.11, 0.12, 0.14)
 HATCH_RGBA = (0.05, 0.05, 0.05, 0.55)
-CAPITAL_RGB = (1.0, 1.0, 1.0)
 ARMY_RGB = (0.08, 0.08, 0.08)
-TOWN_RGB = (0.10, 0.10, 0.11)
 WASH_ALPHA = 0.35  # lowered from 0.45 at the user's request: more terrain shows through
 SUPPLY_ALPHA = 0.35
 
@@ -90,30 +89,22 @@ def _centre(x: float, y: float, s: float) -> tuple[float, float]:
     return x + iso.FACE_W / 2 * s, y + (iso.FACE_TOP + iso.FACE_H / 2) * s
 
 
-def _capital(cr, x: float, y: float, s: float) -> None:
+def _structure(cr, name: str, x: float, y: float, s: float) -> None:
+    """Stand the structure sprite on the tile's top-face centre."""
     cx, cy = _centre(x, y, s)
-    half_w, half_h = 5.5 * s, 3.5 * s
-    cr.set_source_rgb(*CAPITAL_RGB)
-    cr.move_to(cx, cy - half_h)
-    cr.line_to(cx + half_w, cy)
-    cr.line_to(cx, cy + half_h)
-    cr.line_to(cx - half_w, cy)
-    cr.close_path()
-    cr.fill()
+    cr.save()
+    cr.translate(round(cx - ANCHOR[0] * s), round(cy - ANCHOR[1] * s))
+    cr.scale(s, s)
+    cr.set_source_surface(load_structure(name), 0, 0)
+    cr.get_source().set_filter(cairo.FILTER_NEAREST)
+    cr.paint()
+    cr.restore()
 
 
 def _army(cr, x: float, y: float, s: float) -> None:
     cx, cy = _centre(x, y, s)
     cr.set_source_rgb(*ARMY_RGB)
     cr.arc(cx + 9 * s, cy + 4 * s, 3.0 * s, 0, 6.2832)
-    cr.fill()
-
-
-def _town(cr, x: float, y: float, s: float) -> None:
-    cx, cy = _centre(x, y, s)
-    cr.set_source_rgb(*TOWN_RGB)
-    for dx, h in ((-5, 4), (-1, 6), (3, 3)):
-        cr.rectangle(cx + dx * s, cy + (1 - h) * s, 3 * s, h * s)
     cr.fill()
 
 
@@ -127,10 +118,9 @@ def _province(cr, sheet, province: ProvinceCell, x: float, y: float, s: float, b
         _hatch(cr, x, y, s)
     if bound is not None and province.controller_faction_id == bound:
         _outline(cr, x, y, s, rgb)
-    if province.terrain == "urban":
-        _town(cr, x, y, s)
-    if province.is_capital:
-        _capital(cr, x, y, s)
+    structure = structure_for(province)
+    if structure is not None:
+        _structure(cr, structure, x, y, s)
     if province.has_armies:
         _army(cr, x, y, s)
 

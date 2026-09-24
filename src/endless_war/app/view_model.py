@@ -29,6 +29,7 @@ class ProvinceCell:
     has_armies: bool
     has_supply_problem: bool
     terrain: str
+    is_industrial: bool  # a supply source, like a capital
 
 
 @dataclass(frozen=True, slots=True)

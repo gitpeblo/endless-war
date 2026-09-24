@@ -213,3 +213,14 @@ def test_every_province_carries_its_terrain() -> None:
         world.provinces[pid].terrain for pid in sorted(world.provinces)
     ]
     assert len({c.terrain for c in view.provinces}) > 1, "premise: seed 42 has varied terrain"
+
+
+def test_industrial_provinces_are_flagged_as_the_supply_system_counts_them() -> None:
+    from endless_war.simulation.systems.supply import INDUSTRIAL_SOURCE_THRESHOLD
+
+    world, cfg = _world()
+    view = build_view(world, cfg, bound_faction_id=None, speed="1x")
+    assert [c.is_industrial for c in view.provinces] == [
+        world.provinces[pid].industry >= INDUSTRIAL_SOURCE_THRESHOLD for pid in sorted(world.provinces)
+    ]
+    assert any(c.is_industrial for c in view.provinces), "premise: seed 42 has industry"

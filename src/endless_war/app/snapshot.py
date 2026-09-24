@@ -12,6 +12,7 @@ from typing import Any
 from endless_war.app.view_model import EventLine, FactionRow, ProvinceCell, WorldView
 from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.movement import hostile_armies_in
+from endless_war.simulation.systems.supply import INDUSTRIAL_SOURCE_THRESHOLD
 
 RECENT_EVENT_LIMIT = 12
 
@@ -47,6 +48,7 @@ def _province_cells(
                 has_armies=armies_here.get(pid, False),
                 has_supply_problem=province.supply_value < low_supply_threshold,
                 terrain=province.terrain,
+                is_industrial=province.industry >= INDUSTRIAL_SOURCE_THRESHOLD,
             )
         )
     return tuple(cells)
