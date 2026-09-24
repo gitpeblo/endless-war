@@ -26,7 +26,7 @@ HATCH_RGBA = (0.05, 0.05, 0.05, 0.55)
 CAPITAL_RGB = (1.0, 1.0, 1.0)
 ARMY_RGB = (0.08, 0.08, 0.08)
 TOWN_RGB = (0.10, 0.10, 0.11)
-WASH_ALPHA = 0.45
+WASH_ALPHA = 0.35  # lowered from 0.45 at the user's request: more terrain shows through
 SUPPLY_ALPHA = 0.35
 
 

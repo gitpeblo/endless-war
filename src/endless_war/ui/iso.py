@@ -32,13 +32,17 @@ class Board:
 
 
 def _extent(cols: int, rows: int) -> tuple[int, int, int, int]:
-    """Unscaled (width, height, left, top) of the board and its ring, relative to cell (0, 0)."""
-    c0, r0 = -BORDER, -BORDER
-    c1, r1 = cols - 1 + BORDER, rows - 1 + BORDER
-    left = (c0 - r1) * STEP_X
-    right = (c1 - r0) * STEP_X + TILE_W
-    top = (c0 + r0) * STEP_Y
-    bottom = (c1 + r1) * STEP_Y + TILE_H + WATER_DROP
+    """Unscaled (width, height, left, top) of the land, relative to cell (0, 0).
+
+    The sea ring is left out on purpose: fitting and centring on the land lets
+    the map open closer (the user found a fit that included the sea too far
+    out), and the ring simply runs off the widget's edges.
+    """
+    c1, r1 = cols - 1, rows - 1
+    left = -r1 * STEP_X
+    right = c1 * STEP_X + TILE_W
+    top = 0
+    bottom = (c1 + r1) * STEP_Y + TILE_H
     return right - left, bottom - top, left, top
 
 

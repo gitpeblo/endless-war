@@ -485,13 +485,13 @@ Two speeds were added above 16x, at the user's request: `32x` and `64x`. `clock.
 ## 2026-09-24 — Isometric pixel-art map: dark terrain under a faction wash
 
 **Decision:**
-The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tileset" (CC0 1.0, https://newc-42.itch.io/pixel-art-isometric-map-tileset), committed as `src/endless_war/ui/assets/terrain.png`. Terrain is the simulation's own (`Province.terrain`), drawn darkened and desaturated; each province is washed in its controller's colour at 45 %. The map opens at the scale that exactly fills its area, sampled nearest-neighbour; zoom steps above that are whole numbers.
+The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tileset" (CC0 1.0, https://newc-42.itch.io/pixel-art-isometric-map-tileset), committed as `src/endless_war/ui/assets/terrain.png`. Terrain is the simulation's own (`Province.terrain`), drawn darkened and desaturated; each province is washed in its controller's colour at 35 % (first 45 %; lowered at the user's request so more terrain shows through). The map opens at the scale at which the land exactly fills its area (the sea ring may run off the edges), sampled nearest-neighbour; zoom steps above that are whole numbers.
 
 **Reason:**
 - The user asked for 8-bit art that is serious rather than cartoonish, "grim and dark", and chose this pack. It is CC0, so it can live in the repo.
 - Terrain already changes battles (`[balance.terrain_defence]`) but was invisible; the map now shows it.
 - Of four mockups rendered from a real game, the user chose D. The per-tile outline (A, C) was busy and read weakly on dense forest, and bright terrain (A, B) was not grim.
-- The first build used whole-number scales only, to keep every pixel square. At the default window that meant 1×, and the user found it too zoomed out; they chose "fill the space" over half steps or a bigger default window. Nearest-neighbour keeps hard edges; some pixel rows come out one screen pixel wider than others, which is barely visible at this size.
+- The first build used whole-number scales only, to keep every pixel square. At the default window that meant 1×, and the user found it too zoomed out; they chose "fill the space" over half steps or a bigger default window. Fitting land and sea together still opened too far out (about 1.26×), so the fit ignores the sea ring (about 1.51× at the default window). Nearest-neighbour keeps hard edges; some pixel rows come out one screen pixel wider than others, which is barely visible at this size.
 
 **Alternatives considered:**
 - *Fantasy Hex Tiles (CC-BY 4.0).* A hex pack; would have changed the grid, and its towns and castles are medieval, which the user ruled out.

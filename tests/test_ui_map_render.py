@@ -59,11 +59,12 @@ def test_the_wash_is_the_provinces_faction_colour(monkeypatch) -> None:
     pid = next(c.id for c in view.provinces if not c.is_capital)
     view = _plain(view, pid)
     washed = _pixel(_render(view), *_probe(pid))
+    alpha = map_view.WASH_ALPHA
     monkeypatch.setattr(map_view, "WASH_ALPHA", 0.0)
     base = _pixel(_render(view), *_probe(pid))
     cell = next(c for c in view.provinces if c.id == pid)
     want = [round(v * 255) for v in faction_rgb(cell.color_key)]
-    got = [b + (w - b) / 0.45 for w, b in zip(washed, base)]
+    got = [b + (w - b) / alpha for w, b in zip(washed, base)]
     assert all(abs(g - v) <= 6 for g, v in zip(got, want)), (got, want)
 
 
@@ -131,3 +132,8 @@ def test_rendering_is_stable_for_the_same_view() -> None:
     view = _view(4 * 30)
     first, second = _render(view), _render(view)
     assert bytes(first.get_data()) == bytes(second.get_data())
+
+
+def test_the_wash_lets_the_terrain_show_through() -> None:
+    # The user asked for more transparency than the first 45 %.
+    assert map_view.WASH_ALPHA == 0.35

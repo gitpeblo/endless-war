@@ -14,9 +14,11 @@ from endless_war.ui.iso import (
 
 
 def test_the_fitted_scale_fills_the_widget() -> None:
-    # 12 x 8 provinces plus the water ring is 576 x 316 unscaled.
-    assert board_for(96, 12, 600, 400).scale == pytest.approx(min(600 / 576, 400 / 316))
-    assert board_for(96, 12, 1400, 800).scale == pytest.approx(min(1400 / 576, 800 / 316))
+    # The fit is to the land alone: 12 x 8 provinces are 480 x 264 unscaled.
+    # The sea ring around them may run off the edges (the user wanted the map
+    # to open closer than a fit that included the sea).
+    assert board_for(96, 12, 600, 400).scale == pytest.approx(min(600 / 480, 400 / 264))
+    assert board_for(96, 12, 1400, 800).scale == pytest.approx(min(1400 / 480, 800 / 264))
 
 
 def test_the_fitted_scale_has_a_floor() -> None:
@@ -24,14 +26,18 @@ def test_the_fitted_scale_has_a_floor() -> None:
     assert board_for(96, 12, 0, 0).scale == MIN_SCALE
 
 
+def _land(cols: int = 12, rows: int = 8):
+    return [cell for cell in draw_order(cols, rows) if 0 <= cell[0] < cols and 0 <= cell[1] < rows]
+
+
 def test_the_board_is_centred() -> None:
     for size in ((600, 400), (800, 400), (1400, 800)):
         board = board_for(96, 12, *size)
         xs, ys = [], []
-        for c, r in draw_order(12, 8):
+        for c, r in _land():
             x, y = tile_origin(board, c, r)
             xs += [x, x + 48 * board.scale]
-            ys += [y, y + 52 * board.scale]
+            ys += [y, y + 48 * board.scale]
         assert abs((min(xs) + max(xs)) / 2 - size[0] / 2) <= 1, size
         assert abs((min(ys) + max(ys)) / 2 - size[1] / 2) <= 1, size
 
@@ -70,14 +76,14 @@ def test_points_off_the_board_hit_nothing() -> None:
     assert province_at(board, x, y, 96) is None
 
 
-def test_the_whole_board_fits_inside_the_widget() -> None:
+def test_all_the_land_fits_inside_the_widget() -> None:
     for size in ((600, 400), (980, 640), (1400, 800)):
         board = board_for(96, 12, *size)
         xs, ys = [], []
-        for c, r in draw_order(12, 8):
+        for c, r in _land():
             x, y = tile_origin(board, c, r)
             xs += [x, x + 48 * board.scale]
-            ys += [y, y + (48 + 4) * board.scale]
+            ys += [y, y + 48 * board.scale]
         assert min(xs) >= -1 and max(xs) <= size[0] + 1, size
         assert min(ys) >= -1 and max(ys) <= size[1] + 1, size
 
