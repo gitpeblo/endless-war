@@ -172,6 +172,14 @@ Records war declarations and peace (critical), province captures (major), and
 battles whose combined single-tick losses exceed `significant_battle_losses`.
 The log is capped at 2000 entries, oldest evicted first.
 
+## 11. Casualty history — `systems/history.py`
+
+At the end of every tick whose simulated date is later than the last reading's,
+one `CasualtyReading` is appended: the date and time, and every faction's
+cumulative casualties, sorted by id. The cadence is by date, not by tick count,
+so a day-sized catch-up tick still records exactly one reading per day. Readings
+are frozen and kept forever (about 36,500 in a century). The History tab draws them.
+
 ## Invariants — `simulation/invariants.py`
 
 After any tick the world must satisfy: province count unchanged, every province

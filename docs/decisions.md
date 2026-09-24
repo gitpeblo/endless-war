@@ -444,3 +444,25 @@ The War Room polls `SimulationService.latest_view()` from a 250 ms `GLib.timeout
 - Found by running it: showing or presenting the window handed keyboard focus to the 1x button, so a space typed into another app at that moment changed the speed. `WarRoom.show()` clears the focus after presenting. The buttons stay focusable, so Tab still reaches them; making them unfocusable was tried first and rejected in review as a permanent keyboard-access loss for a momentary problem.
 - The event feed is shown newest-first, because its scroller opens at the top.
 - The map legend paints its swatches with the map's own cell painters, so it cannot drift from what the map shows.
+
+## 2026-09-24 — History tab: casualties recorded in the simulation, cumulative, validated palette
+
+**Decision:**
+The casualty series is recorded by the simulation (`systems/history.py`, one frozen reading per simulated date, kept in `WorldState`) rather than sampled by the window. The chart plots cumulative totals. The factions were recoloured to the dataviz reference palette's dark steps (blue, orange, teal, gold, pink). `build_view` reuses the previous view's event lines.
+
+**Reason:**
+- A series recorded in world state is saved by persistence (sub-project B) with no extra work, so a loaded game keeps its history; a window-side sample would belong to one window and vanish on restart.
+- Cumulative totals only rise, read at a glance, and compare factions directly; the user chose it over deaths-per-month.
+- The old palette failed the validator on the map background (#1c1f24): violet vs blue at normal-vision ΔE 11.6 (floor 15) and colour-blind ΔE 3.7; amber outside the lightness band. The new five pass every check for line charts.
+- Converting a full 2000-event log to view lines measured 1.5 ms per snapshot against a 1 ms budget; ids are consecutive and the log evicts only from the left, so the previous tuple can be sliced and only new events converted. Measured after: 0.17 ms with 10 years of readings and 2000 events; the 10-year CLI run 4.78 s (was 4.7 s).
+
+**Alternatives considered:**
+- *Sample in the window.* Rejected for the persistence reason above.
+- *Keep the old colours and rely on labels.* Rejected: violet/blue is hard to tell apart even with full colour vision, on the map as much as the chart.
+- *Rebuild the event log every snapshot.* Rejected on the measurement above.
+
+**Consequences:**
+- No five colours can pass all-pairs colour-blind separation (the reference palette validates only its first three). On the map the legend and the bound-faction outline are the secondary encoding; on the chart, the direct labels.
+- `build_view(previous=...)` must be given a view of the same world; only `SimulationService` passes it.
+- Readings are never downsampled. A century is ~36,500 readings; the chart strokes at most one per horizontal pixel.
+- Coincident series (two factions with equal mutual losses) draw on top of each other; the later faction's line shows, and the hover tooltip gives exact values. Their direct labels are spread apart and kept inside the widget.

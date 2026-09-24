@@ -38,7 +38,7 @@ For each strategic tick:
 8. occupation/control changes
 9. morale/exhaustion/stability
 10. diplomacy/war termination checks
-11. event generation
+11. event generation and the daily casualty reading (`systems/history.py`)
 12. persistence checkpoint when due
 
 ## UI stack
@@ -52,9 +52,9 @@ Practical notes:
 
 ### The `ui/` package
 
-`src/endless_war/ui/` is the War Room: a GTK 3 window (`app.py`) with a cairo-drawn province map (`map_view.py`), a legend drawn with the map's own cell painters (`legend.py`), a status panel and event feed, and an Ayatana tray indicator (`tray.py`). A `GLib.timeout_add` timer on the GTK thread pulls `SimulationService.latest_view()` every 250 ms and repaints; buttons and tray items only `submit()` commands. No widget method is ever called from the simulation thread, and the timer callback has an exception boundary, because GLib silently drops a timeout source whose callback raises; a caught failure stays in the header as `UI FAULT: …`.
+`src/endless_war/ui/` is the War Room: a GTK 3 window (`app.py`) with two tabs in a `Gtk.Notebook`, and an Ayatana tray indicator (`tray.py`). **Map** holds the cairo-drawn province map (`map_view.py`), a legend drawn with the map's own cell painters (`legend.py`), a status panel and the recent-events strip. **History** (`history_tab.py`) holds per-faction toggles that double as the legend, the cairo casualty chart (`chart.py`) and the full event log, newest first. Toggles only change what the chart draws; they never submit a command. A `GLib.timeout_add` timer on the GTK thread pulls `SimulationService.latest_view()` every 250 ms and repaints; buttons and tray items only `submit()` commands. No widget method is ever called from the simulation thread, and the timer callback has an exception boundary, because GLib silently drops a timeout source whose callback raises; a caught failure stays in the header as `UI FAULT: …`.
 
-Everything worth testing is a pure function with no display: `colors.py`, `geometry.py` (province id ↔ grid cell), `panels.py` (text formatting), and the `render_map` / `render_legend` functions, which draw on any cairo context. The widgets are a thin shell around them.
+Everything worth testing is a pure function with no display: `colors.py`, `geometry.py` (province id ↔ grid cell), `panels.py` (text formatting), `chart.py`'s helpers (`nice_ticks`, `compact_number`, `x_ticks`, `nearest_reading`, `spread_labels`), and the `render_map` / `render_legend` / `render_casualty_chart` functions, which draw on any cairo context. The widgets are a thin shell around them.
 
 **Import rule:** `ui/` imports `app/` and `endless_war.config` (a leaf module with no project imports) and nothing else from the project. `ui/app.py`'s `main()` imports `generate_world` locally so the module-scope import graph stays UI-only.
 
