@@ -1,11 +1,14 @@
-"""The strategic map.
+"""The strategic map: an isometric board of darkened pixel-art terrain.
 
 `render_map` draws onto any cairo context, so it can be tested against an
 image surface with no display. `MapView` is the GTK widget wrapped around it.
+Each province is its terrain tile, washed in its controller's colour; the
+markers sit on the tile's top face.
 """
 
 from __future__ import annotations
 
+import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -13,68 +16,123 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk  # noqa: E402
 
 from endless_war.app.view_model import ProvinceCell, WorldView  # noqa: E402
-from endless_war.ui.colors import darken, faction_rgb, lighten  # noqa: E402
-from endless_war.ui.geometry import Cell, cell_for  # noqa: E402
+from endless_war.ui import iso  # noqa: E402
+from endless_war.ui.colors import faction_rgb, lighten  # noqa: E402
+from endless_war.ui.terrain import WATER, load_sheet, tile_for  # noqa: E402
 
 BACKGROUND = (0.11, 0.12, 0.14)
 HATCH_RGBA = (0.05, 0.05, 0.05, 0.55)
 CAPITAL_RGB = (1.0, 1.0, 1.0)
 ARMY_RGB = (0.08, 0.08, 0.08)
+TOWN_RGB = (0.10, 0.10, 0.11)
+WASH_ALPHA = 0.45
+SUPPLY_ALPHA = 0.35
 
 
-def _fill(cr, cell: Cell, province: ProvinceCell) -> None:
-    rgb = faction_rgb(province.color_key)
-    if province.has_supply_problem:
-        rgb = darken(rgb)
-    cr.set_source_rgb(*rgb)
-    cr.rectangle(cell.x, cell.y, cell.width, cell.height)
+def _blit(cr, sheet, cell: tuple[int, int], x: float, y: float, s: float) -> None:
+    row, col = cell
+    cr.save()
+    cr.translate(x, y)
+    cr.scale(s, s)
+    cr.rectangle(0, 0, iso.TILE_W, iso.TILE_H)
+    cr.clip()
+    cr.set_source_surface(sheet, -col * iso.TILE_W, -row * iso.TILE_H)
+    cr.get_source().set_filter(cairo.FILTER_NEAREST)
+    cr.paint()
+    cr.restore()
+
+
+def _face(cr, x: float, y: float, s: float, inset: float = 0.0) -> None:
+    """The top-face diamond of the tile whose cell's top-left is (x, y)."""
+    cx, top = x + iso.FACE_W / 2 * s, y + iso.FACE_TOP * s
+    half_h = iso.FACE_H / 2 * s
+    cr.move_to(cx, top + inset)
+    cr.line_to(x + iso.FACE_W * s - 2 * inset, top + half_h)
+    cr.line_to(cx, top + 2 * half_h - inset)
+    cr.line_to(x + 2 * inset, top + half_h)
+    cr.close_path()
+
+
+def _wash(cr, x: float, y: float, s: float, rgb, alpha: float) -> None:
+    _face(cr, x, y, s)
+    cr.set_source_rgba(*rgb, alpha)
     cr.fill()
 
 
-def _hatch(cr, cell: Cell) -> None:
+def _hatch(cr, x: float, y: float, s: float) -> None:
     cr.save()
-    cr.rectangle(cell.x, cell.y, cell.width, cell.height)
+    _face(cr, x, y, s)
     cr.clip()
     cr.set_source_rgba(*HATCH_RGBA)
-    cr.set_line_width(1.5)
-    step = 6.0
-    offset = -cell.height
-    while offset < cell.width:
-        cr.move_to(cell.x + offset, cell.y)
-        cr.line_to(cell.x + offset + cell.height, cell.y + cell.height)
-        offset += step
+    cr.set_line_width(1.5 * s)
+    top, height = y + iso.FACE_TOP * s, iso.FACE_H * s
+    offset = -height
+    while offset < iso.FACE_W * s:
+        cr.move_to(x + offset, top)
+        cr.line_to(x + offset + height, top + height)
+        offset += 6 * s
     cr.stroke()
     cr.restore()
 
 
-def _capital(cr, cell: Cell) -> None:
-    size = min(cell.width, cell.height) * 0.22
-    cx, cy = cell.x + cell.width / 2, cell.y + cell.height / 2
+def _outline(cr, x: float, y: float, s: float, rgb) -> None:
+    _face(cr, x, y, s, inset=1.5 * s)
+    cr.set_source_rgb(*lighten(rgb))
+    cr.set_line_width(2.0 * s)
+    cr.stroke()
+
+
+def _centre(x: float, y: float, s: float) -> tuple[float, float]:
+    return x + iso.FACE_W / 2 * s, y + (iso.FACE_TOP + iso.FACE_H / 2) * s
+
+
+def _capital(cr, x: float, y: float, s: float) -> None:
+    cx, cy = _centre(x, y, s)
+    half_w, half_h = 5.5 * s, 3.5 * s
     cr.set_source_rgb(*CAPITAL_RGB)
-    cr.move_to(cx, cy - size)
-    cr.line_to(cx + size, cy)
-    cr.line_to(cx, cy + size)
-    cr.line_to(cx - size, cy)
+    cr.move_to(cx, cy - half_h)
+    cr.line_to(cx + half_w, cy)
+    cr.line_to(cx, cy + half_h)
+    cr.line_to(cx - half_w, cy)
     cr.close_path()
     cr.fill()
 
 
-def _army(cr, cell: Cell) -> None:
-    radius = min(cell.width, cell.height) * 0.12
+def _army(cr, x: float, y: float, s: float) -> None:
+    cx, cy = _centre(x, y, s)
     cr.set_source_rgb(*ARMY_RGB)
-    cr.arc(cell.x + cell.width * 0.78, cell.y + cell.height * 0.78, radius, 0, 6.2832)
+    cr.arc(cx + 9 * s, cy + 4 * s, 3.0 * s, 0, 6.2832)
     cr.fill()
 
 
-def _bound_outline(cr, cell: Cell, province: ProvinceCell) -> None:
-    cr.set_source_rgb(*lighten(faction_rgb(province.color_key)))
-    cr.set_line_width(2.0)
-    cr.rectangle(cell.x + 1, cell.y + 1, cell.width - 2, cell.height - 2)
-    cr.stroke()
+def _town(cr, x: float, y: float, s: float) -> None:
+    cx, cy = _centre(x, y, s)
+    cr.set_source_rgb(*TOWN_RGB)
+    for dx, h in ((-5, 4), (-1, 6), (3, 3)):
+        cr.rectangle(cx + dx * s, cy + (1 - h) * s, 3 * s, h * s)
+    cr.fill()
+
+
+def _province(cr, sheet, province: ProvinceCell, x: float, y: float, s: float, bound: int | None) -> None:
+    _blit(cr, sheet, tile_for(province.terrain, province.id), x, y, s)
+    rgb = faction_rgb(province.color_key)
+    _wash(cr, x, y, s, rgb, WASH_ALPHA)
+    if province.has_supply_problem:
+        _wash(cr, x, y, s, (0.0, 0.0, 0.0), SUPPLY_ALPHA)
+    if province.is_contested:
+        _hatch(cr, x, y, s)
+    if bound is not None and province.controller_faction_id == bound:
+        _outline(cr, x, y, s, rgb)
+    if province.terrain == "urban":
+        _town(cr, x, y, s)
+    if province.is_capital:
+        _capital(cr, x, y, s)
+    if province.has_armies:
+        _army(cr, x, y, s)
 
 
 def render_map(cr, view: WorldView, width: float, height: float, cols: int) -> None:
-    """Draw every province of `view` into a `width` x `height` area."""
+    """Draw every province of `view` as an isometric board in `width` x `height`."""
     cr.set_source_rgb(*BACKGROUND)
     cr.rectangle(0, 0, width, height)
     cr.fill()
@@ -83,20 +141,17 @@ def render_map(cr, view: WorldView, width: float, height: float, cols: int) -> N
     if count == 0 or width <= 0 or height <= 0:
         return
 
-    for province in view.provinces:
-        cell = cell_for(province.id, count, cols, width, height)
-        _fill(cr, cell, province)
-        if province.is_contested:
-            _hatch(cr, cell)
-        if province.is_capital:
-            _capital(cr, cell)
-        if province.has_armies:
-            _army(cr, cell)
-        if (
-            view.bound_faction_id is not None
-            and province.controller_faction_id == view.bound_faction_id
-        ):
-            _bound_outline(cr, cell, province)
+    board = iso.board_for(count, cols, width, height)
+    sheet = load_sheet()
+    by_cell = {(p.id % cols, p.id // cols): p for p in view.provinces}
+    s = board.scale
+    for col, row in iso.draw_order(board.cols, board.rows):
+        x, y = iso.tile_origin(board, col, row)
+        province = by_cell.get((col, row))
+        if province is None:
+            _blit(cr, sheet, WATER, x, y + iso.WATER_DROP * s, s)
+        else:
+            _province(cr, sheet, province, x, y, s, view.bound_faction_id)
 
 
 class MapView(Gtk.DrawingArea):
