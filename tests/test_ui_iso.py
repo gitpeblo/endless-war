@@ -71,3 +71,67 @@ def test_the_whole_board_fits_inside_the_widget() -> None:
             ys += [y, y + (48 + 4) * board.scale]
         assert min(xs) >= 0 and max(xs) <= size[0], size
         assert min(ys) >= 0 and max(ys) <= size[1], size
+
+
+from endless_war.ui.iso import (  # noqa: E402
+    KEEP_VISIBLE,
+    MAX_SCALE,
+    Camera,
+    board_with,
+    pan_by,
+    zoom_at,
+)
+
+SIZE = (600, 400)  # the board fits at scale 1 here
+
+
+def test_no_camera_is_the_fitted_board() -> None:
+    assert board_with(96, 12, *SIZE, None) == board_for(96, 12, *SIZE)
+
+
+def test_zooming_in_keeps_the_province_under_the_cursor() -> None:
+    fitted = board_for(96, 12, *SIZE)
+    for pid in (0, 11, 45, 95):
+        x, y = face_centre(fitted, pid % 12, pid // 12)
+        camera = zoom_at(96, 12, *SIZE, None, x, y, +1)
+        assert camera is not None and camera.scale == 2
+        zoomed = board_with(96, 12, *SIZE, camera)
+        assert province_at(zoomed, x, y, 96) == pid, pid
+        zx, zy = face_centre(zoomed, pid % 12, pid // 12)
+        assert abs(zx - x) <= 2 and abs(zy - y) <= 2, (pid, zx - x, zy - y)
+
+
+def test_zooming_back_to_the_fitted_scale_recentres() -> None:
+    x, y = face_centre(board_for(96, 12, *SIZE), 3, 2)
+    camera = zoom_at(96, 12, *SIZE, None, x, y, +1)
+    camera = pan_by(96, 12, *SIZE, camera, 40, -25)
+    assert zoom_at(96, 12, *SIZE, camera, x, y, -1) is None
+
+
+def test_zooming_out_past_the_fitted_scale_stays_fitted() -> None:
+    assert zoom_at(96, 12, *SIZE, None, 300, 200, -1) is None
+
+
+def test_zoom_stops_at_the_maximum() -> None:
+    camera = Camera(MAX_SCALE, 0.0, 0.0)
+    assert zoom_at(96, 12, *SIZE, camera, 300, 200, +1).scale == MAX_SCALE
+
+
+def test_panning_moves_the_board_by_the_drag() -> None:
+    before = board_for(96, 12, *SIZE)
+    camera = pan_by(96, 12, *SIZE, None, 30, -20)
+    after = board_with(96, 12, *SIZE, camera)
+    assert (after.origin_x - before.origin_x, after.origin_y - before.origin_y) == (30, -20)
+
+
+def test_the_board_cannot_be_dragged_out_of_sight() -> None:
+    for dx, dy in ((10_000, 0), (-10_000, 0), (0, 10_000), (0, -10_000)):
+        camera = pan_by(96, 12, *SIZE, Camera(4, 0.0, 0.0), dx, dy)
+        board = board_with(96, 12, *SIZE, camera)
+        xs, ys = [], []
+        for c, r in draw_order(12, 8):
+            x, y = tile_origin(board, c, r)
+            xs += [x, x + 48 * board.scale]
+            ys += [y, y + 52 * board.scale]
+        assert max(xs) >= KEEP_VISIBLE and min(xs) <= SIZE[0] - KEEP_VISIBLE, (dx, dy)
+        assert max(ys) >= KEEP_VISIBLE and min(ys) <= SIZE[1] - KEEP_VISIBLE, (dx, dy)

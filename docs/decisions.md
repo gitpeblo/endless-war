@@ -503,3 +503,4 @@ The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tile
 - `geometry.cell_for` / `province_at` are gone; `iso.province_at` replaces them, ready for province selection.
 - Darkening the sheet costs one Python pass over its pixels at first draw: 66 ms, measured.
 - The legend's terrain section makes the side column taller than the default 640 px window, so the side column scrolls.
+- Zoom (scroll wheel) and pan (middle-button drag) were added at the user's request. Zoom moves in whole-scale steps from the fitted scale up to 8×, anchored at the cursor; zooming back down to the fitted scale recentres and clears the pan; panning is clamped so at least 48 px of the board stays on screen. The state lives in `MapView`, never in the simulation.

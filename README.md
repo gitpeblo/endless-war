@@ -6,7 +6,7 @@ The game simulates multiple AI-controlled factions, shifting front lines, logist
 
 ## Running it
 
-The War Room window shows an isometric pixel-art map of the provinces and their terrain, a status panel (the whole world, or one faction with `--faction`), a legend and the event feed, and keeps running in the tray when you close it. A History tab charts each faction's cumulative dead over time (tick factions on and off to compare) above the full event log:
+The War Room window shows an isometric pixel-art map of the provinces and their terrain (scroll to zoom, drag with the middle button to pan), a status panel (the whole world, or one faction with `--faction`), a legend and the event feed, and keeps running in the tray when you close it. A History tab charts each faction's cumulative dead over time (tick factions on and off to compare) above the full event log:
 
 ```bash
 bin/run_gui.sh                                  # watch, seed 42, 1x (a 6-hour tick per second)

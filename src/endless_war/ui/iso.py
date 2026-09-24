@@ -83,3 +83,93 @@ def province_at(board: Board, x: float, y: float, province_count: int) -> int | 
         return None
     pid = row * board.cols + col
     return pid if pid < province_count else None
+
+
+# -- zoom and pan -------------------------------------------------------------
+
+MAX_SCALE = 8
+KEEP_VISIBLE = 48  # px of the board that must stay on screen while panning
+
+
+@dataclass(frozen=True, slots=True)
+class Camera:
+    """A zoom level (integer, so pixel art stays sharp) and a pan offset in px.
+
+    No camera means "fit": the largest integer scale that fits, centred.
+    """
+
+    scale: int
+    pan_x: float = 0.0
+    pan_y: float = 0.0
+
+
+def _centred(width: float, height: float, w: int, h: int, left: int, top: int, scale: int) -> tuple[float, float]:
+    return (width - w * scale) / 2 - left * scale, (height - h * scale) / 2 - top * scale
+
+
+def board_with(
+    province_count: int, cols: int, width: float, height: float, camera: Camera | None
+) -> Board:
+    """The board as `camera` shows it; the fitted board when there is no camera."""
+    if camera is None:
+        return board_for(province_count, cols, width, height)
+    columns, rows = grid_shape(province_count, cols)
+    w, h, left, top = _extent(columns, rows)
+    cx, cy = _centred(width, height, w, h, left, top, camera.scale)
+    return Board(
+        columns, rows, camera.scale,
+        math.floor(cx + camera.pan_x), math.floor(cy + camera.pan_y),
+    )
+
+
+def _clamp(province_count: int, cols: int, width: float, height: float, camera: Camera) -> Camera:
+    """Keep at least KEEP_VISIBLE px of the board inside the widget on each axis."""
+    columns, rows = grid_shape(province_count, cols)
+    w, h, _left, _top = _extent(columns, rows)
+    s = camera.scale
+    # With no pan the board's bounding box starts at (width - w*s) / 2.
+    box_x, box_y = (width - w * s) / 2, (height - h * s) / 2
+    pan_x = min(max(camera.pan_x, KEEP_VISIBLE - w * s - box_x), width - KEEP_VISIBLE - box_x)
+    pan_y = min(max(camera.pan_y, KEEP_VISIBLE - h * s - box_y), height - KEEP_VISIBLE - box_y)
+    return Camera(s, pan_x, pan_y)
+
+
+def zoom_at(
+    province_count: int, cols: int, width: float, height: float,
+    camera: Camera | None, x: float, y: float, steps: int,
+) -> Camera | None:
+    """Zoom by `steps` whole scale steps, keeping the point (x, y) where it is.
+
+    Zooming back down to the fitted scale returns None: the map recentres and
+    the pan is forgotten, so the whole board is always one scroll away.
+    """
+    fit = board_for(province_count, cols, width, height).scale
+    current = camera.scale if camera is not None else fit
+    new = min(MAX_SCALE, max(1, current + steps))
+    if new <= fit:
+        return None
+    if new == current:
+        return camera
+    before = board_with(province_count, cols, width, height, camera)
+    ux = (x - before.origin_x) / before.scale
+    uy = (y - before.origin_y) / before.scale
+    columns, rows = grid_shape(province_count, cols)
+    w, h, left, top = _extent(columns, rows)
+    cx, cy = _centred(width, height, w, h, left, top, new)
+    return _clamp(
+        province_count, cols, width, height,
+        Camera(new, x - ux * new - cx, y - uy * new - cy),
+    )
+
+
+def pan_by(
+    province_count: int, cols: int, width: float, height: float,
+    camera: Camera | None, dx: float, dy: float,
+) -> Camera:
+    """Move the board by (dx, dy) px, clamped so it cannot leave the widget."""
+    if camera is None:
+        camera = Camera(board_for(province_count, cols, width, height).scale)
+    return _clamp(
+        province_count, cols, width, height,
+        Camera(camera.scale, camera.pan_x + dx, camera.pan_y + dy),
+    )

@@ -12,8 +12,9 @@ import cairo
 import gi
 
 gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
 
-from gi.repository import Gtk  # noqa: E402
+from gi.repository import Gdk, Gtk  # noqa: E402
 
 from endless_war.app.view_model import ProvinceCell, WorldView  # noqa: E402
 from endless_war.ui import iso  # noqa: E402
@@ -131,8 +132,14 @@ def _province(cr, sheet, province: ProvinceCell, x: float, y: float, s: float, b
         _army(cr, x, y, s)
 
 
-def render_map(cr, view: WorldView, width: float, height: float, cols: int) -> None:
-    """Draw every province of `view` as an isometric board in `width` x `height`."""
+def render_map(
+    cr, view: WorldView, width: float, height: float, cols: int,
+    camera: iso.Camera | None = None,
+) -> None:
+    """Draw every province of `view` as an isometric board in `width` x `height`.
+
+    `camera` is the widget's zoom and pan; without one the board fits and centres.
+    """
     cr.set_source_rgb(*BACKGROUND)
     cr.rectangle(0, 0, width, height)
     cr.fill()
@@ -141,7 +148,7 @@ def render_map(cr, view: WorldView, width: float, height: float, cols: int) -> N
     if count == 0 or width <= 0 or height <= 0:
         return
 
-    board = iso.board_for(count, cols, width, height)
+    board = iso.board_with(count, cols, width, height, camera)
     sheet = load_sheet()
     by_cell = {(p.id % cols, p.id // cols): p for p in view.provinces}
     s = board.scale
@@ -155,18 +162,82 @@ def render_map(cr, view: WorldView, width: float, height: float, cols: int) -> N
 
 
 class MapView(Gtk.DrawingArea):
-    """A drawing area that paints the newest `WorldView` it was given."""
+    """Paints the newest `WorldView`; the scroll wheel zooms, a middle drag pans.
+
+    Zoom and pan are this widget's own state: they change what is shown, never
+    the world.
+    """
 
     def __init__(self, cols: int) -> None:
         super().__init__()
         self._cols = cols
         self._view: WorldView | None = None
+        self.camera: iso.Camera | None = None
+        self._drag_from: tuple[float, float] | None = None
         self.set_size_request(480, 320)
+        self.add_events(
+            Gdk.EventMask.SCROLL_MASK
+            | Gdk.EventMask.SMOOTH_SCROLL_MASK
+            | Gdk.EventMask.BUTTON_PRESS_MASK
+            | Gdk.EventMask.BUTTON_RELEASE_MASK
+            | Gdk.EventMask.BUTTON2_MOTION_MASK
+        )
         self.connect("draw", self._on_draw)
+        self.connect("scroll-event", self._on_scroll)
+        self.connect("button-press-event", self._on_press)
+        self.connect("button-release-event", self._on_release)
+        self.connect("motion-notify-event", self._on_motion)
 
     def set_view(self, view: WorldView) -> None:
         self._view = view
         self.queue_draw()
+
+    def _province_count(self) -> int:
+        return len(self._view.provinces) if self._view is not None else 0
+
+    def _on_scroll(self, _widget, event) -> bool:
+        if event.direction == Gdk.ScrollDirection.UP:
+            steps = 1
+        elif event.direction == Gdk.ScrollDirection.DOWN:
+            steps = -1
+        elif event.direction == Gdk.ScrollDirection.SMOOTH:
+            _ok, _dx, dy = event.get_scroll_deltas()
+            steps = 1 if dy < 0 else -1 if dy > 0 else 0
+        else:
+            steps = 0
+        count = self._province_count()
+        if steps and count:
+            a = self.get_allocation()
+            self.camera = iso.zoom_at(
+                count, self._cols, a.width, a.height, self.camera, event.x, event.y, steps
+            )
+            self.queue_draw()
+        return True
+
+    def _on_press(self, _widget, event) -> bool:
+        if event.button == 2:
+            self._drag_from = (event.x, event.y)
+            return True
+        return False
+
+    def _on_release(self, _widget, event) -> bool:
+        if event.button == 2:
+            self._drag_from = None
+            return True
+        return False
+
+    def _on_motion(self, _widget, event) -> bool:
+        count = self._province_count()
+        if self._drag_from is None or not count:
+            return False
+        a = self.get_allocation()
+        x0, y0 = self._drag_from
+        self.camera = iso.pan_by(
+            count, self._cols, a.width, a.height, self.camera, event.x - x0, event.y - y0
+        )
+        self._drag_from = (event.x, event.y)
+        self.queue_draw()
+        return True
 
     def _on_draw(self, _widget, cr) -> bool:
         allocation = self.get_allocation()
@@ -175,5 +246,7 @@ class MapView(Gtk.DrawingArea):
             cr.rectangle(0, 0, allocation.width, allocation.height)
             cr.fill()
             return False
-        render_map(cr, self._view, allocation.width, allocation.height, self._cols)
+        render_map(
+            cr, self._view, allocation.width, allocation.height, self._cols, self.camera
+        )
         return False
