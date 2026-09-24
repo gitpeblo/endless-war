@@ -191,3 +191,37 @@ def test_the_axes_have_titles() -> None:
     surface = _render(_readings(60), {0, 1})
     assert _bright_pixels(surface, range(0, 16), range(HEIGHT)) > 20, "y-axis title"
     assert _bright_pixels(surface, range(WIDTH), range(HEIGHT - 9, HEIGHT)) > 20, "x-axis title"
+
+
+def test_spread_labels_never_pushes_past_the_lowest_allowed_position() -> None:
+    # At the start of a game every faction sits at zero; pushing five labels
+    # down from the baseline ran the last one off the bottom of the widget.
+    out = spread_labels([200.0] * 5, 14.0, lowest=210.0)
+    assert max(out) == 210.0
+    assert sorted(out) == [154.0, 168.0, 182.0, 196.0, 210.0]
+
+
+def test_all_zero_labels_stay_inside_the_widget() -> None:
+    zeros = tuple(
+        CasualtyReading(T0 + timedelta(days=d), tuple((fid, 0) for fid in range(5)))
+        for d in range(5)
+    )
+    factions = tuple(_faction(fid, key, f"F{fid}") for fid, key in
+                     enumerate(("blue", "orange", "teal", "gold", "pink")))
+    surface = cairo.ImageSurface(cairo.FORMAT_RGB24, WIDTH, HEIGHT)
+    render_casualty_chart(cairo.Context(surface), zeros, factions, frozenset(range(5)), WIDTH, HEIGHT)
+    surface.flush()
+    for key in ("blue", "orange", "teal", "gold", "pink"):
+        label_stroke = _count_in(surface, faction_rgb(key), range(int(WIDTH - MARGIN_RIGHT) + 6, WIDTH))
+        assert label_stroke > 0, f"{key} label is off the widget"
+
+
+def _count_in(surface, rgb, xs: range, tolerance: int = 3) -> int:
+    want = [round(c * 255) for c in rgb]
+    data, stride = surface.get_data(), surface.get_stride()
+    return sum(
+        1
+        for y in range(surface.get_height())
+        for x in xs
+        if all(abs(data[y * stride + x * 4 + 2 - k] - want[k]) <= tolerance for k in range(3))
+    )

@@ -107,14 +107,25 @@ def nearest_reading(readings, x: float, width: float) -> int | None:
     return i
 
 
-def spread_labels(ys: list[float], min_gap: float) -> list[float]:
-    """Push overlapping label positions down until each is `min_gap` apart."""
+def spread_labels(ys: list[float], min_gap: float, lowest: float | None = None) -> list[float]:
+    """Space label positions `min_gap` apart, never below `lowest`.
+
+    Overlaps are pushed down first; if that runs past `lowest`, the stack is
+    pushed back up from the bottom instead.
+    """
+    order = sorted(range(len(ys)), key=lambda k: ys[k])
     out = list(ys)
     previous: float | None = None
-    for i in sorted(range(len(ys)), key=lambda k: ys[k]):
+    for i in order:
         if previous is not None and out[i] < previous + min_gap:
             out[i] = previous + min_gap
         previous = out[i]
+    if lowest is not None:
+        ceiling = lowest
+        for i in reversed(order):
+            if out[i] > ceiling:
+                out[i] = ceiling
+            ceiling = out[i] - min_gap
     return out
 
 
@@ -178,8 +189,8 @@ def _axis_titles(cr, x0: float, x1: float, y0: float, y1: float, height: float) 
     cr.restore()
 
 
-def _direct_labels(cr, ends: list[tuple[FactionRow, float]], x1: float) -> None:
-    ys = spread_labels([y for _, y in ends], LABEL_GAP)
+def _direct_labels(cr, ends: list[tuple[FactionRow, float]], x1: float, lowest: float) -> None:
+    ys = spread_labels([y for _, y in ends], LABEL_GAP, lowest=lowest)
     for (faction, _), y in zip(ends, ys):
         cr.set_source_rgb(*faction_rgb(faction.color_key))
         cr.set_line_width(LINE_WIDTH)
@@ -294,7 +305,7 @@ def render_casualty_chart(
                 cr.line_to(x, y)
         cr.stroke()
         ends.append((faction, y_of(latest.get(faction.id, 0))))
-    _direct_labels(cr, ends, x1)
+    _direct_labels(cr, ends, x1, lowest=height - FONT_SIZE)
 
     if hover_x is not None:
         index = nearest_reading(readings, hover_x, width)
