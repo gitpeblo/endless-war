@@ -134,7 +134,9 @@ def _passes(row: dict) -> dict[str, bool]:
         "events": row["events"] < GATE["events"],
         "largest_share": row["largest_share"] <= GATE["largest_share"],
         "violations": row["violations"] == 0,
-        "seconds": row["seconds"] < GATE["seconds"],
+        # Wall-clock time is reported, not gated: it varied 5.4-6.0 s between
+        # identical runs, so a 6 s limit failed at random (final review). The
+        # 10-year CLI budget is checked separately with `time`.
     }
 
 

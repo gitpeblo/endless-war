@@ -48,7 +48,11 @@ def update_recruitment(world: WorldState, rng: random.Random, config: dict[str, 
         fac = world.factions[fid]
         population = sum(p.population for p in _controlled_provinces(world, fid))
         cap = population * ceiling
-        headroom = max(0.0, cap - fac.manpower)
+        # Men already in the field count against the ceiling too. Counting only
+        # the pool let reinforcement drain it into armies while recruitment
+        # refilled it: 48M of 48.6M people under arms by year 30 (final review).
+        fielded = sum(a.manpower for a in world.armies.values() if a.faction_id == fid)
+        headroom = max(0.0, cap - fac.manpower - fielded)
         recruits = headroom * rate * (1.0 - fac.exhaustion)
         fac.manpower = max(0, int(fac.manpower + recruits))
 

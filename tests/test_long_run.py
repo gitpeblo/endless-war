@@ -102,3 +102,24 @@ def test_run_is_reproducible() -> None:
             (p.controller_faction_id, p.supply_value) for p in world.provinces.values()
         ])
     assert results[0] == results[1]
+
+
+def test_mobilization_stays_within_the_ceiling(ten_year_world) -> None:
+    """Reserves plus fielded men never exceed the mobilization ceiling (with slack).
+
+    The field grew without bound once reinforcement existed (final review):
+    11.8M under arms against a 3.9M ceiling at year 10, seed 42.
+    """
+    from endless_war.config import load_config
+
+    ceiling = load_config()["balance"]["mobilization_ceiling"]
+    for fid, fac in ten_year_world.factions.items():
+        population = sum(
+            p.population for p in ten_year_world.provinces.values() if p.controller_faction_id == fid
+        )
+        fielded = sum(a.manpower for a in ten_year_world.armies.values() if a.faction_id == fid)
+        if fac.eliminated:
+            continue
+        assert fac.manpower + fielded <= 1.25 * ceiling * population + 50_000, (
+            f"faction {fid}: {fac.manpower + fielded:,} mobilized for {population:,} people"
+        )

@@ -50,3 +50,22 @@ def test_reinforcement_is_deterministic() -> None:
     assert [(x.id, x.manpower, x.province_id) for x in a.armies.values()] == [
         (x.id, x.manpower, x.province_id) for x in b.armies.values()
     ]
+
+
+def test_men_in_the_field_count_against_the_mobilization_ceiling() -> None:
+    # Recruitment refilled the pool while reinforcement drained it into armies,
+    # so fielded men never counted: by year 30 at seed 42, 48M of 48.6M people
+    # were under arms (final review).
+    from endless_war.simulation.systems.economy import update_recruitment
+    import random
+
+    w, cfg = _world()
+    population = sum(p.population for p in w.provinces.values() if p.controller_faction_id == 0)
+    cap = population * cfg["balance"]["mobilization_ceiling"]
+    for a in w.armies.values():
+        if a.faction_id == 0:
+            a.manpower = int(cap)  # already more than the whole ceiling in the field
+    w.factions[0].manpower = 0
+    for _ in range(100):
+        update_recruitment(w, random.Random(1), cfg)
+    assert w.factions[0].manpower == 0, "no recruits while the field already exceeds the ceiling"

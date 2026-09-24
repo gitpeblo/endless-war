@@ -525,15 +525,15 @@ The war model was redesigned after the user reported that isolated provinces wer
 | 7 | 146 | 8 | 475 | 3.25 | 6 | 0.49 | 29 | {} |
 | 99 | 235 | 10 | 993 | 4.23 | 9 | 0.47 | 47 | {} |
 
-after:
+after (including the final-review fixes):
 
 | seed | battles | battle_years | captures | captures_per_battle | map_changes | largest_share | longest_enclave_days | wars_ended | eliminated |
 |---|---|---|---|---|---|---|---|---|---|
-| 42 | 1707 | 10 | 88 | 0.05 | 9 | 0.49 | 1536 | 49 | {4: 7} |
-| 7 | 1707 | 10 | 99 | 0.06 | 9 | 0.41 | 2751 | 51 | {2: 8} |
-| 99 | 1607 | 10 | 120 | 0.07 | 9 | 0.47 | 1454 | 57 | {4: 6} |
+| 42 | 1213 | 10 | 79 | 0.07 | 9 | 0.36 | 2888 | 53 | {4: 2} |
+| 7 | 1471 | 10 | 104 | 0.07 | 9 | 0.42 | 1954 | 59 | {} |
+| 99 | 1990 | 10 | 113 | 0.06 | 9 | 0.35 | 2864 | 59 | {} |
 
-The gate (no enemy-surrounded island over 180 days, at most 3 captures per battle, the map changing in at least 6 of 9 year transitions, under 2000 events, no faction over 70 % of the map, clean invariants, 10-year CLI under 6 s) **passes on all three seeds**; the 10-year CLI run takes 5.45 s. Enclaves (a lone cell surrounded by other factions, at war or not, the user's report) last at most 1,454 to 2,751 days, against the whole decade before; they are now finished by a later war rather than never.
+The gate (no enemy-surrounded island over 180 days, at most 3 captures per battle, the map changing in at least 6 of 9 year transitions, under 2000 events, no faction over 70 % of the map, clean invariants, 10-year CLI under 6 s) **passes on all three seeds**; the 10-year CLI run takes about 5.4 s (wall-clock time is reported, not gated, since it varied 5.4 to 6.0 s between identical runs). Enclaves (a lone cell surrounded by other factions, at war or not, the user's report) last at most 1,954 to 2,888 days, against the whole decade before; they are now finished by a later war rather than never.
 
 **Alternatives considered:**
 - *Quality scoring or defender retreat alone* (2026-09-23): each was reverted then; they are in, but only work with routing, garrisons and reinforcement.
@@ -545,3 +545,5 @@ The gate (no enemy-surrounded island over 180 days, at most 3 captures per battl
 - `peace_exhaustion_threshold` is no longer dead config: war weariness makes it reachable.
 - Ownership now changes at peace (`diplomacy._settle`); `test_long_run` checks that a landless faction is eliminated instead of that every faction owns land.
 - This closes the 2026-09-23 "linked pair" (quality scoring with churn) and "absorbing state" notes.
+- **Final review, critical, fixed:** recruitment counted only the reserve pool against `mobilization_ceiling`, so reinforcement let field armies grow without bound (48M of 48.6M people under arms by year 30 at seed 42). Fielded men now count; over 30 years the field stays at about 3.3M against a 3.9M ceiling, and wars are still being fought.
+- **Final review, not applied (ruling):** holding a province while an enemy stands in it, and besiegers staying until a garrison breaks. Both were implemented and measured: the full rule made one faction reach 74 to 93 % of the map within ten years; the defender half alone failed the island limit at seed 99 (205 days). Without it the gate passes, so it was not forced through by tuning. Cost: a defender facing an invader can still step out every other tick.
