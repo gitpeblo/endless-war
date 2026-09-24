@@ -19,13 +19,14 @@ FACE_TOP = 16
 FACE_W, FACE_H = 48, 24
 BORDER = 1  # ring of water tiles around the board
 WATER_DROP = 4  # water sits this far below the land
+MIN_SCALE = 0.25
 
 
 @dataclass(frozen=True, slots=True)
 class Board:
     cols: int
     rows: int
-    scale: int
+    scale: float
     origin_x: float  # screen x of cell (0, 0)'s top-left corner
     origin_y: float
 
@@ -42,10 +43,16 @@ def _extent(cols: int, rows: int) -> tuple[int, int, int, int]:
 
 
 def board_for(province_count: int, cols: int, width: float, height: float) -> Board:
-    """The largest integer scale that fits, centred in `width` x `height`."""
+    """The scale that exactly fills `width` x `height`, centred.
+
+    The user asked for the map to open filling its space rather than at the
+    largest whole scale that fits, which left it small. A fractional scale
+    with nearest-neighbour sampling keeps hard pixel edges; zoom steps above
+    it are whole numbers (see `zoom_at`).
+    """
     columns, rows = grid_shape(province_count, cols)
     w, h, left, top = _extent(columns, rows)
-    scale = max(1, int(min(width / w, height / h)))
+    scale = max(MIN_SCALE, min(width / w, height / h))
     origin_x = (width - w * scale) / 2 - left * scale
     origin_y = (height - h * scale) / 2 - top * scale
     return Board(columns, rows, scale, math.floor(origin_x), math.floor(origin_y))
@@ -88,22 +95,20 @@ def province_at(board: Board, x: float, y: float, province_count: int) -> int | 
 # -- zoom and pan -------------------------------------------------------------
 
 MAX_SCALE = 8
-KEEP_VISIBLE = 48  # px of the board that must stay on screen while panning
+KEEP_VISIBLE = 48  # px: some of the board stays at least this far inside the widget
+_EPS = 1e-9
 
 
 @dataclass(frozen=True, slots=True)
 class Camera:
-    """A zoom level (integer, so pixel art stays sharp) and a pan offset in px.
+    """A zoom level and a pan offset in px. No camera means "fit and centre"."""
 
-    No camera means "fit": the largest integer scale that fits, centred.
-    """
-
-    scale: int
+    scale: float
     pan_x: float = 0.0
     pan_y: float = 0.0
 
 
-def _centred(width: float, height: float, w: int, h: int, left: int, top: int, scale: int) -> tuple[float, float]:
+def _centred(width: float, height: float, w: int, h: int, left: int, top: int, scale: float) -> tuple[float, float]:
     return (width - w * scale) / 2 - left * scale, (height - h * scale) / 2 - top * scale
 
 
@@ -122,16 +127,55 @@ def board_with(
     )
 
 
+def _closest_on_segment(a, b, p) -> tuple[float, float]:
+    ax, ay = a
+    dx, dy = b[0] - ax, b[1] - ay
+    length = dx * dx + dy * dy
+    t = 0.0 if length == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / length))
+    return ax + t * dx, ay + t * dy
+
+
+def _closest_in_polygon(corners, p) -> tuple[float, float]:
+    """`p` itself if it is inside the convex polygon, else its nearest boundary point."""
+    sides = list(zip(corners, corners[1:] + corners[:1]))
+    crosses = [
+        (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) for a, b in sides
+    ]
+    if all(c >= 0 for c in crosses) or all(c <= 0 for c in crosses):
+        return p
+    candidates = [_closest_on_segment(a, b, p) for a, b in sides]
+    return min(candidates, key=lambda q: (q[0] - p[0]) ** 2 + (q[1] - p[1]) ** 2)
+
+
 def _clamp(province_count: int, cols: int, width: float, height: float, camera: Camera) -> Camera:
-    """Keep at least KEEP_VISIBLE px of the board inside the widget on each axis."""
-    columns, rows = grid_shape(province_count, cols)
-    w, h, _left, _top = _extent(columns, rows)
-    s = camera.scale
-    # With no pan the board's bounding box starts at (width - w*s) / 2.
-    box_x, box_y = (width - w * s) / 2, (height - h * s) / 2
-    pan_x = min(max(camera.pan_x, KEEP_VISIBLE - w * s - box_x), width - KEEP_VISIBLE - box_x)
-    pan_y = min(max(camera.pan_y, KEEP_VISIBLE - h * s - box_y), height - KEEP_VISIBLE - box_y)
-    return Camera(s, pan_x, pan_y)
+    """Keep part of the board itself, not just its bounding box, on screen.
+
+    The board is a diamond, so its bounding box has empty corners. Take the
+    diamond through the four corner provinces' face centres, find its point
+    nearest the widget centre, and pan just enough to bring that point at
+    least KEEP_VISIBLE px inside the widget.
+    """
+    board = board_with(province_count, cols, width, height, camera)
+    last_c, last_r = board.cols - 1, board.rows - 1
+    corners = [
+        face_centre(board, c, r) for c, r in ((0, 0), (last_c, 0), (last_c, last_r), (0, last_r))
+    ]
+    px, py = _closest_in_polygon(corners, (width / 2, height / 2))
+    inset_x, inset_y = min(KEEP_VISIBLE, width / 2), min(KEEP_VISIBLE, height / 2)
+    tx = min(max(px, inset_x), width - inset_x)
+    ty = min(max(py, inset_y), height - inset_y)
+    return Camera(camera.scale, camera.pan_x + (tx - px), camera.pan_y + (ty - py))
+
+
+def refit(
+    province_count: int, cols: int, width: float, height: float, camera: Camera | None
+) -> Camera | None:
+    """`camera` for a widget of a new size: dropped at or below the new fit, else re-clamped."""
+    if camera is None:
+        return None
+    if camera.scale <= board_for(province_count, cols, width, height).scale + _EPS:
+        return None
+    return _clamp(province_count, cols, width, height, camera)
 
 
 def zoom_at(
@@ -140,15 +184,22 @@ def zoom_at(
 ) -> Camera | None:
     """Zoom by `steps` whole scale steps, keeping the point (x, y) where it is.
 
-    Zooming back down to the fitted scale returns None: the map recentres and
-    the pan is forgotten, so the whole board is always one scroll away.
+    Steps land on whole numbers above the fitted scale (a fit of 1.3 zooms to
+    2, then 3...). Zooming back to or below the fit returns None: the map
+    recentres and the pan is forgotten, so the whole board is one scroll away.
     """
     fit = board_for(province_count, cols, width, height).scale
     current = camera.scale if camera is not None else fit
-    new = min(MAX_SCALE, max(1, current + steps))
-    if new <= fit:
+    new = current
+    for _ in range(abs(steps)):
+        if steps > 0:
+            new = math.floor(new + _EPS) + 1
+        else:
+            new = math.ceil(new - _EPS) - 1
+    new = min(MAX_SCALE, new)
+    if new <= fit + _EPS:
         return None
-    if new == current:
+    if camera is not None and abs(new - current) < _EPS:
         return camera
     before = board_with(province_count, cols, width, height, camera)
     ux = (x - before.origin_x) / before.scale

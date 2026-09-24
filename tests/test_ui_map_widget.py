@@ -1,4 +1,6 @@
+import math
 import os
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -44,7 +46,7 @@ def test_scrolling_up_zooms_in_one_step_and_down_zooms_back_to_fit() -> None:
         w, h = _size(area)
         fit = board_for(96, 12, w, h).scale
         area._on_scroll(area, SimpleNamespace(direction=Gdk.ScrollDirection.UP, x=w / 2, y=h / 2))
-        assert area.camera is not None and area.camera.scale == fit + 1
+        assert area.camera is not None and area.camera.scale == math.floor(fit) + 1
         area._on_scroll(area, SimpleNamespace(direction=Gdk.ScrollDirection.DOWN, x=w / 2, y=h / 2))
         assert area.camera is None
     finally:
@@ -88,5 +90,45 @@ def test_other_buttons_do_not_pan() -> None:
         area._on_press(area, SimpleNamespace(button=1, x=100.0, y=100.0))
         area._on_motion(area, SimpleNamespace(x=200.0, y=200.0))
         assert area.camera is None
+    finally:
+        window.destroy()
+
+
+def test_small_smooth_scroll_deltas_add_up_to_one_step() -> None:
+    # A touchpad sends many small deltas; one full step per event jumped
+    # straight to the maximum zoom (final review).
+    window, area = _shown_map()
+    try:
+        w, h = _size(area)
+        fit = board_for(96, 12, w, h).scale
+        for _ in range(10):
+            area._on_scroll(area, SimpleNamespace(
+                direction=Gdk.ScrollDirection.SMOOTH, x=w / 2, y=h / 2,
+                get_scroll_deltas=lambda: (True, 0.0, -0.1),
+            ))
+        assert area.camera is not None and area.camera.scale == math.floor(fit) + 1
+    finally:
+        window.destroy()
+
+
+def test_resizing_after_a_pan_refits_the_map() -> None:
+    window, area = _shown_map()
+    try:
+        area._on_press(area, SimpleNamespace(button=2, x=100.0, y=100.0))
+        area._on_motion(area, SimpleNamespace(x=140.0, y=100.0))
+        area._on_release(area, SimpleNamespace(button=2, x=140.0, y=100.0))
+        assert area.camera is not None
+        window.resize(1400, 800)
+        # The window manager applies the resize asynchronously; pump with a
+        # little real time so the new size and the redraw both arrive.
+        for _ in range(400):
+            while Gtk.events_pending():
+                Gtk.main_iteration_do(False)
+            if area.camera is None or area.get_allocation().width > 900 and area._size == (
+                area.get_allocation().width, area.get_allocation().height
+            ):
+                break
+            time.sleep(0.005)
+        assert area.camera is None, "the map kept the old scale after the window grew"
     finally:
         window.destroy()

@@ -485,13 +485,13 @@ Two speeds were added above 16x, at the user's request: `32x` and `64x`. `clock.
 ## 2026-09-24 — Isometric pixel-art map: dark terrain under a faction wash
 
 **Decision:**
-The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tileset" (CC0 1.0, https://newc-42.itch.io/pixel-art-isometric-map-tileset), committed as `src/endless_war/ui/assets/terrain.png`. Terrain is the simulation's own (`Province.terrain`), drawn darkened and desaturated; each province is washed in its controller's colour at 45 %. Tiles are scaled by whole numbers only, with nearest-neighbour sampling.
+The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tileset" (CC0 1.0, https://newc-42.itch.io/pixel-art-isometric-map-tileset), committed as `src/endless_war/ui/assets/terrain.png`. Terrain is the simulation's own (`Province.terrain`), drawn darkened and desaturated; each province is washed in its controller's colour at 45 %. The map opens at the scale that exactly fills its area, sampled nearest-neighbour; zoom steps above that are whole numbers.
 
 **Reason:**
 - The user asked for 8-bit art that is serious rather than cartoonish, "grim and dark", and chose this pack. It is CC0, so it can live in the repo.
 - Terrain already changes battles (`[balance.terrain_defence]`) but was invisible; the map now shows it.
 - Of four mockups rendered from a real game, the user chose D. The per-tile outline (A, C) was busy and read weakly on dense forest, and bright terrain (A, B) was not grim.
-- Pixel art blurs at fractional scales, so the board picks the largest integer scale that fits and centres itself.
+- The first build used whole-number scales only, to keep every pixel square. At the default window that meant 1×, and the user found it too zoomed out; they chose "fill the space" over half steps or a bigger default window. Nearest-neighbour keeps hard edges; some pixel rows come out one screen pixel wider than others, which is barely visible at this size.
 
 **Alternatives considered:**
 - *Fantasy Hex Tiles (CC-BY 4.0).* A hex pack; would have changed the grid, and its towns and castles are medieval, which the user ruled out.
@@ -503,4 +503,4 @@ The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tile
 - `geometry.cell_for` / `province_at` are gone; `iso.province_at` replaces them, ready for province selection.
 - Darkening the sheet costs one Python pass over its pixels at first draw: 66 ms, measured.
 - The legend's terrain section makes the side column taller than the default 640 px window, so the side column scrolls.
-- Zoom (scroll wheel) and pan (middle-button drag) were added at the user's request. Zoom moves in whole-scale steps from the fitted scale up to 8×, anchored at the cursor; zooming back down to the fitted scale recentres and clears the pan; panning is clamped so at least 48 px of the board stays on screen. The state lives in `MapView`, never in the simulation.
+- Zoom (scroll wheel) and pan (middle-button drag) were added at the user's request. Zoom moves in whole-scale steps from the fitted scale up to 8×, anchored at the cursor; zooming back down to the fitted scale recentres and clears the pan; panning is clamped on the board's diamond, not its bounding box (whose empty corners let the map vanish, per the final review): the diamond's point nearest the widget centre stays at least 48 px inside. A resize drops a camera at or below the new fit and re-clamps any other. Smooth-scroll deltas accumulate, so a touchpad swipe zooms one step per unit of scroll, not per event. The state lives in `MapView`, never in the simulation.

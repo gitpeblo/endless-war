@@ -33,8 +33,11 @@ SUPPLY_ALPHA = 0.35
 def _blit(cr, sheet, cell: tuple[int, int], x: float, y: float, s: float) -> None:
     row, col = cell
     cr.save()
-    cr.translate(x, y)
+    # At a fractional fitted scale, whole-pixel tile corners and an aliased
+    # clip keep neighbouring tiles from leaving hairline seams between them.
+    cr.translate(round(x), round(y))
     cr.scale(s, s)
+    cr.set_antialias(cairo.ANTIALIAS_NONE)
     cr.rectangle(0, 0, iso.TILE_W, iso.TILE_H)
     cr.clip()
     cr.set_source_surface(sheet, -col * iso.TILE_W, -row * iso.TILE_H)
@@ -174,6 +177,10 @@ class MapView(Gtk.DrawingArea):
         self._view: WorldView | None = None
         self.camera: iso.Camera | None = None
         self._drag_from: tuple[float, float] | None = None
+        self._scroll_acc = 0.0  # smooth-scroll deltas not yet worth a step
+        # The widget size the camera was made for; a draw at any other size
+        # re-fits or re-clamps it.
+        self._size: tuple[int, int] | None = None
         self.set_size_request(480, 320)
         self.add_events(
             Gdk.EventMask.SCROLL_MASK
@@ -201,8 +208,19 @@ class MapView(Gtk.DrawingArea):
         elif event.direction == Gdk.ScrollDirection.DOWN:
             steps = -1
         elif event.direction == Gdk.ScrollDirection.SMOOTH:
+            # Touchpads and high-resolution wheels send many small deltas;
+            # a step is one whole unit of accumulated scroll, not one event.
             _ok, _dx, dy = event.get_scroll_deltas()
-            steps = 1 if dy < 0 else -1 if dy > 0 else 0
+            if dy == 0:
+                self._scroll_acc = 0.0  # end of a touchpad gesture
+            self._scroll_acc += dy
+            steps = 0
+            while self._scroll_acc <= -1 + 1e-9:
+                steps += 1
+                self._scroll_acc += 1
+            while self._scroll_acc >= 1 - 1e-9:
+                steps -= 1
+                self._scroll_acc -= 1
         else:
             steps = 0
         count = self._province_count()
@@ -211,6 +229,7 @@ class MapView(Gtk.DrawingArea):
             self.camera = iso.zoom_at(
                 count, self._cols, a.width, a.height, self.camera, event.x, event.y, steps
             )
+            self._size = (a.width, a.height)
             self.queue_draw()
         return True
 
@@ -235,12 +254,20 @@ class MapView(Gtk.DrawingArea):
         self.camera = iso.pan_by(
             count, self._cols, a.width, a.height, self.camera, event.x - x0, event.y - y0
         )
+        self._size = (a.width, a.height)
         self._drag_from = (event.x, event.y)
         self.queue_draw()
         return True
 
     def _on_draw(self, _widget, cr) -> bool:
         allocation = self.get_allocation()
+        size = (allocation.width, allocation.height)
+        if self.camera is not None and size != self._size and self._province_count():
+            # A camera from the old size may now be below the fit or off-screen.
+            self.camera = iso.refit(
+                self._province_count(), self._cols, size[0], size[1], self.camera
+            )
+            self._size = size
         if self._view is None:
             cr.set_source_rgb(*BACKGROUND)
             cr.rectangle(0, 0, allocation.width, allocation.height)

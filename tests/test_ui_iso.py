@@ -1,5 +1,8 @@
+import pytest
+
 from endless_war.ui.iso import (
     BORDER,
+    MIN_SCALE,
     STEP_X,
     STEP_Y,
     board_for,
@@ -10,21 +13,27 @@ from endless_war.ui.iso import (
 )
 
 
-def test_the_scale_is_the_largest_integer_that_fits() -> None:
+def test_the_fitted_scale_fills_the_widget() -> None:
     # 12 x 8 provinces plus the water ring is 576 x 316 unscaled.
-    assert board_for(96, 12, 600, 400).scale == 1
-    assert board_for(96, 12, 1400, 800).scale == 2
-    assert board_for(96, 12, 1800, 1000).scale == 3
+    assert board_for(96, 12, 600, 400).scale == pytest.approx(min(600 / 576, 400 / 316))
+    assert board_for(96, 12, 1400, 800).scale == pytest.approx(min(1400 / 576, 800 / 316))
 
 
-def test_the_scale_never_drops_below_one() -> None:
-    assert board_for(96, 12, 50, 30).scale == 1
-    assert board_for(96, 12, 0, 0).scale == 1
+def test_the_fitted_scale_has_a_floor() -> None:
+    assert board_for(96, 12, 50, 30).scale == MIN_SCALE
+    assert board_for(96, 12, 0, 0).scale == MIN_SCALE
 
 
 def test_the_board_is_centred() -> None:
-    small, big = board_for(96, 12, 600, 400), board_for(96, 12, 800, 400)
-    assert big.origin_x - small.origin_x == 100  # 200 px wider, same scale
+    for size in ((600, 400), (800, 400), (1400, 800)):
+        board = board_for(96, 12, *size)
+        xs, ys = [], []
+        for c, r in draw_order(12, 8):
+            x, y = tile_origin(board, c, r)
+            xs += [x, x + 48 * board.scale]
+            ys += [y, y + 52 * board.scale]
+        assert abs((min(xs) + max(xs)) / 2 - size[0] / 2) <= 1, size
+        assert abs((min(ys) + max(ys)) / 2 - size[1] / 2) <= 1, size
 
 
 def test_tiles_step_isometrically() -> None:
@@ -33,8 +42,8 @@ def test_tiles_step_isometrically() -> None:
         x0, y0 = tile_origin(board, 0, 0)
         x1, y1 = tile_origin(board, 1, 0)
         x2, y2 = tile_origin(board, 0, 1)
-        assert (x1 - x0, y1 - y0) == (STEP_X * board.scale, STEP_Y * board.scale)
-        assert (x2 - x0, y2 - y0) == (-STEP_X * board.scale, STEP_Y * board.scale)
+        assert (x1 - x0, y1 - y0) == pytest.approx((STEP_X * board.scale, STEP_Y * board.scale))
+        assert (x2 - x0, y2 - y0) == pytest.approx((-STEP_X * board.scale, STEP_Y * board.scale))
 
 
 def test_draw_order_is_back_to_front_and_includes_the_ring() -> None:
@@ -69,8 +78,8 @@ def test_the_whole_board_fits_inside_the_widget() -> None:
             x, y = tile_origin(board, c, r)
             xs += [x, x + 48 * board.scale]
             ys += [y, y + (48 + 4) * board.scale]
-        assert min(xs) >= 0 and max(xs) <= size[0], size
-        assert min(ys) >= 0 and max(ys) <= size[1], size
+        assert min(xs) >= -1 and max(xs) <= size[0] + 1, size
+        assert min(ys) >= -1 and max(ys) <= size[1] + 1, size
 
 
 from endless_war.ui.iso import (  # noqa: E402
@@ -79,6 +88,7 @@ from endless_war.ui.iso import (  # noqa: E402
     Camera,
     board_with,
     pan_by,
+    refit,
     zoom_at,
 )
 
@@ -124,14 +134,52 @@ def test_panning_moves_the_board_by_the_drag() -> None:
     assert (after.origin_x - before.origin_x, after.origin_y - before.origin_y) == (30, -20)
 
 
+def _visible_face_centres(board, size) -> int:
+    inside = 0
+    for pid in range(96):
+        x, y = face_centre(board, pid % 12, pid // 12)
+        if 0 <= x <= size[0] and 0 <= y <= size[1]:
+            inside += 1
+    return inside
+
+
 def test_the_board_cannot_be_dragged_out_of_sight() -> None:
-    for dx, dy in ((10_000, 0), (-10_000, 0), (0, 10_000), (0, -10_000)):
-        camera = pan_by(96, 12, *SIZE, Camera(4, 0.0, 0.0), dx, dy)
+    # The bounding box of a diamond board has empty corners: keeping part of
+    # the box on screen still let the map vanish (final review, measured).
+    for scale in (4, 8):
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)):
+            camera = pan_by(96, 12, *SIZE, Camera(scale, 0.0, 0.0), dx * 50_000, dy * 50_000)
+            board = board_with(96, 12, *SIZE, camera)
+            assert _visible_face_centres(board, SIZE) >= 1, (scale, dx, dy)
+
+
+def test_every_corner_can_still_be_reached_when_zoomed_in() -> None:
+    for pid in (0, 11, 84, 95):
+        camera = Camera(8, 0.0, 0.0)
+        for _ in range(50):  # drag toward the corner province until it is centred
+            board = board_with(96, 12, *SIZE, camera)
+            x, y = face_centre(board, pid % 12, pid // 12)
+            camera = pan_by(96, 12, *SIZE, camera, SIZE[0] / 2 - x, SIZE[1] / 2 - y)
         board = board_with(96, 12, *SIZE, camera)
-        xs, ys = [], []
-        for c, r in draw_order(12, 8):
-            x, y = tile_origin(board, c, r)
-            xs += [x, x + 48 * board.scale]
-            ys += [y, y + 52 * board.scale]
-        assert max(xs) >= KEEP_VISIBLE and min(xs) <= SIZE[0] - KEEP_VISIBLE, (dx, dy)
-        assert max(ys) >= KEEP_VISIBLE and min(ys) <= SIZE[1] - KEEP_VISIBLE, (dx, dy)
+        x, y = face_centre(board, pid % 12, pid // 12)
+        assert abs(x - SIZE[0] / 2) <= 2 and abs(y - SIZE[1] / 2) <= 2, pid
+
+
+def test_a_camera_is_refitted_when_the_widget_grows_past_it() -> None:
+    camera = pan_by(96, 12, *SIZE, None, 40, 10)  # a pan at the fitted scale
+    assert refit(96, 12, 1400, 800, camera) is None, "a bigger window must re-fit"
+    zoomed = Camera(3, 0.0, 0.0)
+    assert refit(96, 12, 1400, 800, zoomed).scale == 3, "a zoom above the new fit is kept"
+
+
+def test_a_camera_is_reclamped_when_the_widget_shrinks() -> None:
+    far = pan_by(96, 12, 1500, 900, Camera(3, 0.0, 0.0), 50_000, 0)
+    shrunk = refit(96, 12, *SIZE, far)
+    assert shrunk is not None
+    assert _visible_face_centres(board_with(96, 12, *SIZE, shrunk), SIZE) >= 1
+
+
+def test_zooming_in_from_a_fractional_fit_goes_to_the_next_whole_scale() -> None:
+    fit = board_for(96, 12, 1400, 800).scale  # about 2.43
+    camera = zoom_at(96, 12, 1400, 800, None, 700, 400, +1)
+    assert camera.scale == 3 > fit
