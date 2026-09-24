@@ -114,20 +114,33 @@ def test_a_refresh_failure_is_shown_and_does_not_stop_the_timer() -> None:
         room.map_view.set_view = broken
         assert room._on_timer() is True
         assert "UI FAULT: RuntimeError: boom" in room.header.get_text()
+
+        # A transient failure must not vanish on the next good refresh:
+        # without a terminal, the header is the only place it is seen.
+        del room.map_view.set_view
+        assert room._on_timer() is True
+        assert "UI FAULT: RuntimeError: boom" in room.header.get_text()
     finally:
         room.shutdown()
         service.stop()
 
 
-def test_the_toolbar_buttons_do_not_take_keyboard_focus() -> None:
+def test_showing_the_window_leaves_no_button_focused() -> None:
     # Presenting the window from the tray gives it keyboard focus, and GTK
     # hands that to the first focusable widget -- the 1x button -- so a space
-    # typed into another app at that moment would change the speed. Observed.
+    # typed into another app at that moment changed the speed. Observed.
     service, cfg = _service()
     room = WarRoom(service, cols=cfg["world"]["grid_cols"])
     try:
+        room.show()
+        _pump()
+        assert room.window.get_focus() is None
+        room.window.hide()
+        room._on_open()
+        _pump()
+        assert room.window.get_focus() is None
         for button in room.toolbar_buttons:
-            assert not button.get_can_focus(), button.get_label()
+            assert button.get_can_focus(), "Tab must still reach " + button.get_label()
     finally:
         room.shutdown()
 

@@ -439,8 +439,8 @@ The War Room polls `SimulationService.latest_view()` from a 250 ms `GLib.timeout
 - *Hide Save until persistence exists.* Rejected as above.
 
 **Consequences:**
-- A view can be up to 250 ms stale. That is invisible at every speed.
-- An exception in the refresh path is caught, printed to stderr and shown in the header as `UI FAULT: …`, and the timer keeps running. Found in review: GLib drops a timeout source whose callback raises, which would freeze the window with only a stderr trace.
-- Found by running it: the toolbar buttons do not take keyboard focus. Presenting the window from the tray handed focus to the 1x button, so a space typed into another app at that moment changed the speed. The tray menu is the keyboard route to the same controls.
+- A view can be up to 250 ms stale, and at 16× the service ticks about every 62 ms, so one repaint can jump several ticks. That reads as smooth enough at every speed tried; nothing is lost, because each view is a complete snapshot.
+- An exception in the refresh path is caught, printed to stderr and shown in the header as `UI FAULT: …` for the rest of the session (sticky, so a one-off failure is not erased by the next good refresh), and the timer keeps running. Found in review: GLib drops a timeout source whose callback raises, which would freeze the window with only a stderr trace.
+- Found by running it: showing or presenting the window handed keyboard focus to the 1x button, so a space typed into another app at that moment changed the speed. `WarRoom.show()` clears the focus after presenting. The buttons stay focusable, so Tab still reaches them; making them unfocusable was tried first and rejected in review as a permanent keyboard-access loss for a momentary problem.
 - The event feed is shown newest-first, because its scroller opens at the top.
 - The map legend paints its swatches with the map's own cell painters, so it cannot drift from what the map shows.

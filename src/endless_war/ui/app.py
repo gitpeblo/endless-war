@@ -39,6 +39,9 @@ class WarRoom:
         self._service = service
         self._paused = False
         self._timer_id: int | None = None
+        # Sticky: once shown, a UI fault stays in the header for the rest of
+        # the session, because stderr is invisible when launched from a menu.
+        self._ui_fault: str | None = None
 
         self.window = Gtk.Window(title="Endless War")
         self.window.set_default_size(980, 640)
@@ -48,10 +51,6 @@ class WarRoom:
         outer.set_border_width(6)
         self.window.add(outer)
 
-        # Presenting the window from the tray gives it keyboard focus, and GTK
-        # would hand that to the first focusable button -- so a space typed
-        # into another app at that moment changed the speed. The buttons stay
-        # clickable; the tray menu is the keyboard route to the same controls.
         self.toolbar_buttons: list[Gtk.Button] = []
         bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.header = Gtk.Label(label="")
@@ -66,8 +65,6 @@ class WarRoom:
         self._pause_button.connect("clicked", lambda _b: self._toggle_pause())
         bar.pack_start(self._pause_button, False, False, 0)
         self.toolbar_buttons.append(self._pause_button)
-        for button in self.toolbar_buttons:
-            button.set_can_focus(False)
         outer.pack_start(bar, False, False, 0)
 
         middle = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
@@ -121,7 +118,10 @@ class WarRoom:
             return
         self._paused = view.speed == "paused"
         self._pause_button.set_label("Resume" if self._paused else "Pause")
-        self.header.set_text(header_text(view))
+        header = header_text(view)
+        if self._ui_fault is not None:
+            header += f"   ·   UI FAULT: {self._ui_fault}"
+        self.header.set_text(header)
         self.status.set_text(
             "\n".join(f"{label}  {value}".rstrip() for label, value in status_rows(view))
         )
@@ -142,17 +142,26 @@ class WarRoom:
             self.refresh()
         except Exception as exc:  # noqa: BLE001 - reported, not swallowed
             traceback.print_exc()
+            self._ui_fault = f"{type(exc).__name__}: {exc}"
             try:
-                self.header.set_text(f"UI FAULT: {type(exc).__name__}: {exc}")
+                self.header.set_text(f"UI FAULT: {self._ui_fault}")
             except Exception:  # noqa: BLE001 - the timer must survive
                 pass
         return True
 
     # -- lifecycle --------------------------------------------------------
 
-    def _on_open(self) -> None:
+    def show(self) -> None:
         self.window.show_all()
         self.window.present()
+        # Showing the window gives it keyboard focus, and GTK hands that to
+        # the first focusable widget -- the 1x button -- so a space typed into
+        # another app at that moment changed the speed. Clear it; Tab still
+        # reaches every button once the user is deliberately in the window.
+        self.window.set_focus(None)
+
+    def _on_open(self) -> None:
+        self.show()
 
     def _on_delete(self, _widget, _event) -> bool:
         self.window.hide()
@@ -204,7 +213,7 @@ def main(argv: list[str] | None = None) -> None:
     )
     room = WarRoom(service, cols=config["world"]["grid_cols"])
     service.start()
-    room.window.show_all()
+    room.show()
     try:
         Gtk.main()
     finally:
