@@ -6,6 +6,7 @@ import cairo
 
 N = 32
 OX, OY = 16, 22  # screen position of world (0, 0, 0): the footprint centre
+# Units use a smaller canvas; render() switches these per sprite.
 
 OUTLINE = (0x14, 0x16, 0x1a)
 CONCRETE = ((0xa0, 0xa2, 0xa0), (0x80, 0x82, 0x80), (0x5e, 0x60, 0x60))   # top, left, right
@@ -21,6 +22,10 @@ STEAM = ((0x9a, 0x9c, 0xa0), (0xc0, 0xc2, 0xc4))
 MARBLE = ((0xde, 0xda, 0xcc), (0xbc, 0xb8, 0xaa), (0x90, 0x8c, 0x80))
 GOLD_GLASS = ((0xc8, 0xa2, 0x52), (0x9c, 0x7a, 0x38), (0x72, 0x56, 0x26))
 PALE_LIT = (0xf4, 0xe8, 0xc0)
+# The army: smaller than any structure, olive drab on dark tracks.
+OLIVE = ((0x55, 0x5b, 0x40), (0x4a, 0x4f, 0x37), (0x36, 0x3a, 0x28))
+TRACK = ((0x3a, 0x3b, 0x36), (0x2c, 0x2d, 0x29), (0x1f, 0x20, 0x1d))
+TURRET = ((0x8a, 0x90, 0x6a), (0x72, 0x78, 0x56), (0x55, 0x5a, 0x40))
 
 
 def P(u, v, z):
@@ -130,6 +135,20 @@ def industry(cr):
     cooling_tower(cr, 4, -3)
 
 
+def tank(cr):
+    """A small tank: tracks with road wheels, hull, lighter turret, long barrel along +u."""
+    box(cr, -5.5, -3.5, 11, 2, 2, TRACK)                        # far track
+    box(cr, -5.5, 1.5, 11, 2, 2, TRACK)                         # near track
+    for u in range(-4, 5, 2):                                   # road wheels, near side
+        x, y = P(u, 3.5, 1)
+        pixel(cr, x, y, TRACK[0])
+    box(cr, -5, -3, 10, 6, 2.5, OLIVE, z0=1)                    # hull
+    box(cr, 1.5, -0.75, 8, 1.5, 1.5, TURRET, z0=4.3)            # barrel, as light as the turret
+    box(cr, -2.5, -2, 5, 4, 2, TURRET, z0=3.5)                  # turret
+    x, y = P(-1.5, 2, 5.5)
+    pixel(cr, x, y, PALE_LIT)                                   # hatch light
+
+
 def outline(surface):
     surface.flush()
     data, stride = surface.get_data(), surface.get_stride()
@@ -144,7 +163,9 @@ def outline(surface):
                 pixel(cr, x, y, OUTLINE)
 
 
-def render(fn, path, steam=None):
+def render(fn, path, steam=None, size=32, origin=(16, 22)):
+    global N, OX, OY
+    N, (OX, OY) = size, origin
     surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, N, N)
     cr = cairo.Context(surface)
     cr.set_antialias(cairo.ANTIALIAS_NONE)
@@ -165,3 +186,5 @@ if __name__ == "__main__":
     render(capital, f"{out}/capital.png")
     render(town, f"{out}/town.png")
     render(industry, f"{out}/industry.png", steam=(4, -3, 13))
+    if len(sys.argv) > 2:
+        render(tank, f"{sys.argv[2]}/tank.png", size=24, origin=(12, 15))
