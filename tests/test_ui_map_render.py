@@ -193,3 +193,18 @@ def test_a_contour_runs_where_controllers_differ_and_not_inside() -> None:
     border = edge_pixel(_render(split), 5, 6)
     blue = [round(c * 255) for c in faction_rgb("blue")]
     assert sum(abs(p - q) for p, q in zip(border, blue)) < sum(abs(p - q) for p, q in zip(inside, blue)) - 60
+
+
+def test_contours_lie_under_buildings() -> None:
+    # Layer order: tiles, then contours, then structures and tanks, so no
+    # outline is ever drawn over a building (the user asked for this).
+    view = _plain(_plain(_view(), 13), 1)
+    view = _with(_with(view, 13, color_key="blue", controller_faction_id=0), 1, color_key="blue", controller_faction_id=0)
+    board = board_for(96, COLS, WIDTH, HEIGHT)
+    s = board.scale
+    x, y = tile_origin(board, 1, 1)
+    probe = (x + 29 * s, y + 18.5 * s)  # on the edge shared with cell (1, 0), under the tower
+    split = _with(view, 1, color_key="orange", controller_faction_id=1)
+    assert _pixel(_render(view), *probe) != _pixel(_render(split), *probe), "premise: a contour runs here"
+    with_capital, split_capital = _with(view, 13, is_capital=True), _with(split, 13, is_capital=True)
+    assert _pixel(_render(with_capital), *probe) == _pixel(_render(split_capital), *probe)

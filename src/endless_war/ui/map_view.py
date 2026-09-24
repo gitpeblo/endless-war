@@ -136,9 +136,6 @@ def _province(cr, sheet, province: ProvinceCell, x: float, y: float, s: float, b
         _wash(cr, x, y, s, (0.0, 0.0, 0.0), SUPPLY_ALPHA)
     if province.is_contested:
         _hatch(cr, x, y, s)
-    structure = structure_for(province)
-    if structure is not None:
-        _structure(cr, structure, x, y, s)
 
 
 # Each neighbour, and the edge of this cell's top face it shares: T, R, B, L
@@ -212,7 +209,14 @@ def render_map(
             _blit(cr, sheet, WATER, x, y + iso.WATER_DROP * s, s)
         else:
             _province(cr, sheet, province, x, y, s, view.bound_faction_id)
+    # Layers: tiles (with wash and hatching), then contours, then buildings,
+    # then tanks, so outlines are always above the ground and under every asset.
     _contours(cr, board, by_cell, view.bound_faction_id)
+    for col, row in iso.draw_order(board.cols, board.rows):
+        province = by_cell.get((col, row))
+        structure = structure_for(province) if province is not None else None
+        if structure is not None:
+            _structure(cr, structure, *iso.tile_origin(board, col, row), s)
     # Armies go on top of the finished board, back to front, so no nearer
     # tile or tall terrain can cut a tank off.
     for col, row in iso.draw_order(board.cols, board.rows):
