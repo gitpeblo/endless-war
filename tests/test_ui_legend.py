@@ -5,6 +5,7 @@ from endless_war.config import load_config
 from endless_war.simulation.worldgen import generate_world
 from endless_war.ui.colors import faction_rgb
 from endless_war.ui.legend import (
+    GROUND_RGB,
     PAD,
     TERRAIN_ORDER,
     legend_entries,
@@ -76,7 +77,43 @@ def test_each_faction_swatch_shows_its_wash() -> None:
 
         def distance(key: str) -> float:
             rgb = [c * 255 for c in faction_rgb(key)]
-            return sum((g - (WASH_ALPHA * c)) ** 2 for g, c in zip(got, rgb))
+            ground = [c * 255 for c in GROUND_RGB]
+            want = [gr + WASH_ALPHA * (c - gr) for gr, c in zip(ground, rgb)]
+            return sum((g - w) ** 2 for g, w in zip(got, want))
 
         others = [f.color_key for f in view.factions if f.color_key != entry.color_key]
         assert all(distance(entry.color_key) < distance(k) for k in others), entry.label
+
+
+def _render(view):
+    height = legend_height(view)
+    surface = cairo.ImageSurface(cairo.FORMAT_RGB24, 240, height)
+    render_legend(cairo.Context(surface), view, 240, height)
+    surface.flush()
+    return surface
+
+
+def _px(surface, x, y):
+    data, stride = surface.get_data(), surface.get_stride()
+    o = int(y) * stride + int(x) * 4
+    return data[o + 2], data[o + 1], data[o]
+
+
+def test_the_supply_and_occupied_swatches_are_visible_on_their_ground() -> None:
+    # Drawn on black, a darkening wash and dark hatching were invisible.
+    view = _view()
+    surface = _render(view)
+    entries = legend_entries(view)
+    ground = sum(round(c * 255) for c in GROUND_RGB)
+    for index, entry in enumerate(entries):
+        x, y = swatch_centre(entries, index)
+        if entry.kind == "supply":
+            assert sum(_px(surface, x, y)) < ground - 10, "supply swatch not darker than ground"
+        if entry.kind == "contested":
+            dark = sum(
+                1 for dx in range(-8, 9) for dy in range(-2, 3)
+                if sum(_px(surface, x + dx, y + dy)) < ground - 10
+            )
+            assert dark > 5, "no hatching visible on the occupied swatch"
+        if entry.kind == "army":
+            assert sum(_px(surface, x + 4.5, y + 2)) < ground - 10, "army dot not visible"

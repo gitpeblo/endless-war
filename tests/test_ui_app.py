@@ -241,3 +241,21 @@ def test_the_toolbar_and_tray_offer_every_running_speed() -> None:
         ]
     finally:
         room.shutdown()
+
+
+def test_the_window_fits_its_default_size() -> None:
+    # The legend's terrain section made the side column taller than the
+    # default window, so GTK grew the window to 755 px, too tall for a small
+    # screen. The side column must scroll instead of forcing the size.
+    service, cfg = _service()
+    room = WarRoom(service, cols=cfg["world"]["grid_cols"])
+    try:
+        room.show()
+        _pump()
+        from endless_war.app.snapshot import build_view
+        room.legend.set_view(build_view(service._world, cfg, bound_faction_id=0, speed="1x"))
+        _pump()
+        minimum, _natural = room.window.get_preferred_height()
+        assert minimum <= 640, minimum
+    finally:
+        room.shutdown()

@@ -80,7 +80,13 @@ class WarRoom:
         side.set_size_request(220, -1)
         side.pack_start(self.status, False, False, 0)
         side.pack_start(self.legend, False, False, 0)
-        middle.pack_start(side, False, False, 0)
+        # The status panel plus the legend (with its terrain section) is taller
+        # than the default window; scroll it rather than let it grow the window.
+        side_scroller = Gtk.ScrolledWindow()
+        side_scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        side_scroller.set_propagate_natural_width(True)
+        side_scroller.add(side)
+        middle.pack_start(side_scroller, False, False, 0)
         map_page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         map_page.pack_start(middle, True, True, 0)
 
