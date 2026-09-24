@@ -11,12 +11,13 @@ Reading order for a new session: `README.md` → `specs/00-project-brief.md` →
 ## Commands
 
 ```bash
-python3 -m pytest              # full suite (scripts/test.sh)
+python3 -m pytest              # full suite
 python3 -m pytest tests/test_engine.py::test_tick_advances_time_by_six_hours   # single test
-./scripts/run_cli.sh           # run the prototype entry point (python3 -m endless_war)
+bin/run_gui.sh                 # run the game (War Room window + tray)
+PYTHONPATH=src python3 -m endless_war   # headless: yearly text report
 ```
 
-`pytest` is an optional dependency and is **not installed in the system python3** — install it (`pip install -e '.[dev]'` in a venv) before claiming tests pass. Create that venv with `python3 -m venv --system-site-packages` if it will also run UI code: PyGObject is a system dist-package and is invisible to a plain venv (see `docs/decisions.md`, 2026-09-22). `pyproject.toml` sets `pythonpath = ["src"]`, so pytest imports the package without an install; the shell scripts export `PYTHONPATH` instead.
+`pytest` is an optional dependency and is **not installed in the system python3** — install it (`pip install -e '.[dev]'` in a venv) before claiming tests pass. Create that venv with `python3 -m venv --system-site-packages` if it will also run UI code: PyGObject is a system dist-package and is invisible to a plain venv (see `docs/decisions.md`, 2026-09-22). `pyproject.toml` sets `pythonpath = ["src"]`, so pytest imports the package without an install; `bin/run_gui.sh` exports `PYTHONPATH` itself and works from any directory.
 
 No linter or formatter is configured.
 

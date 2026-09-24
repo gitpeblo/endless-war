@@ -1,8 +1,8 @@
 # Watching a run
 
 ```bash
-./scripts/run_cli.sh                        # 10 simulated years, seed 42
-./scripts/run_cli.sh --years 1 --seed 7     # a shorter run, a different world
+PYTHONPATH=src python3 -m endless_war                        # 10 simulated years, seed 42
+PYTHONPATH=src python3 -m endless_war --years 1 --seed 7     # a shorter run, a different world
 ```
 
 Ten simulated years take about six seconds.

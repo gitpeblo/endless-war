@@ -9,8 +9,8 @@ The game simulates multiple AI-controlled factions, shifting front lines, logist
 The War Room window shows the map, a status panel (the whole world, or one faction with `--faction`), a legend and the event feed, and keeps running in the tray when you close it:
 
 ```bash
-./scripts/run_gui.sh                                  # watch, seed 42, 1x (a 6-hour tick per second)
-./scripts/run_gui.sh --faction 0 --speed 16x --seed 7 # follow faction 0, fast
+bin/run_gui.sh                                  # watch, seed 42, 1x (a 6-hour tick per second)
+bin/run_gui.sh --faction 0 --speed 16x --seed 7 # follow faction 0, fast
 ```
 
 It uses the system GTK 3 and Ayatana indicator packages that Ubuntu MATE already ships. Quit from the tray menu; closing the window only hides it.
@@ -18,8 +18,8 @@ It uses the system GTK 3 and Ayatana indicator packages that Ubuntu MATE already
 For a headless run that prints a yearly report instead:
 
 ```bash
-./scripts/run_cli.sh                        # 10 simulated years, seed 42
-./scripts/run_cli.sh --years 1 --seed 7     # a shorter run, different world
+PYTHONPATH=src python3 -m endless_war                        # 10 simulated years, seed 42
+PYTHONPATH=src python3 -m endless_war --years 1 --seed 7     # a shorter run, different world
 ```
 
 Nothing to install — no virtualenv, no dependencies beyond the Python standard library. Ten simulated years take about six seconds.
@@ -63,7 +63,7 @@ For the exact formulas and the config values that tune them, see
 - `config/` — default configuration and balancing values
 - `assets/` — future icons, map assets, and UI resources
 - `data/saves/` — local save-game location placeholder
-- `scripts/` — development and run helpers
+- `bin/` — `run_gui.sh`, the game launcher
 
 ## Recommended development order
 

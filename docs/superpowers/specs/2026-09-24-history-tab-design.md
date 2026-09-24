@@ -219,7 +219,7 @@ surface for line charts:
 - **Widgets (need `DISPLAY`):** the notebook has tabs "Map" and "History";
   toggling a checkbutton changes the chart's visible set and submits no command
   (stub service records submits); the History log shows the newest event first.
-- **By eye:** launch `./scripts/run_gui.sh --speed 16x`, let it run a simulated
+- **By eye:** launch `bin/run_gui.sh --speed 16x`, let it run a simulated
   year, screenshot both tabs, and check for label collisions and legibility.
 
 ## Documentation
