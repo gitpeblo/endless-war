@@ -17,6 +17,10 @@ RUST = (0x8a, 0x3c, 0x2c)
 FLAG = (0xa8, 0x32, 0x2e)
 MAST = (0x2a, 0x2c, 0x31)
 STEAM = ((0x9a, 0x9c, 0xa0), (0xc0, 0xc2, 0xc4))
+# The capital has its own colours so it cannot be mistaken for grey housing.
+MARBLE = ((0xde, 0xda, 0xcc), (0xbc, 0xb8, 0xaa), (0x90, 0x8c, 0x80))
+GOLD_GLASS = ((0xc8, 0xa2, 0x52), (0x9c, 0x7a, 0x38), (0x72, 0x56, 0x26))
+PALE_LIT = (0xf4, 0xe8, 0xc0)
 
 
 def P(u, v, z):
@@ -65,17 +69,17 @@ def windows(cr, u0, v0, U, V, H, z0=0, du=2, dz=2, lit_every=3, seed=0):
 
 
 def capital(cr):
-    box(cr, -8, -8, 16, 16, 3, CONCRETE)                        # plinth
-    box(cr, -4, -4, 8, 8, 13, GLASS, z0=3)                      # glass tower
+    box(cr, -8, -8, 16, 16, 3, MARBLE)                          # marble plinth
+    box(cr, -4, -4, 8, 8, 13, GOLD_GLASS, z0=3)                 # gold glass tower
     windows(cr, -4, -4, 8, 8, 13, z0=3, du=2, dz=2, lit_every=2, seed=1)
-    box(cr, -4, -4, 8, 8, 1, CONCRETE, z0=16)                   # roof slab
+    box(cr, -4, -4, 8, 8, 1, MARBLE, z0=16)                     # roof slab
     x, y = P(0, 0, 17)
     pixel(cr, x, y - 6, MAST, 1, 6)                             # mast
     pixel(cr, x + 1, y - 6, FLAG, 3, 2)
     pixel(cr, x + 1, y - 4, FLAG, 2, 1)
     for u in (-7, 5):                                           # plinth lights
         px, py = P(u, 8, 2)
-        pixel(cr, px, py, LIT)
+        pixel(cr, px, py, PALE_LIT)
 
 
 def town(cr):
