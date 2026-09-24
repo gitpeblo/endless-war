@@ -1,7 +1,8 @@
 """The map legend.
 
-Every swatch is drawn with the map's own cell painters, so the legend cannot
-drift from what the map actually shows. `legend_entries` and `render_legend`
+Swatches are painted with the map's own painters on a small top-face diamond,
+so the legend cannot drift from what the map shows. The terrain section shows
+the same darkened tiles the map uses. `legend_entries` and `render_legend`
 need no display; `LegendView` is the GTK widget wrapped around them.
 """
 
@@ -15,38 +16,46 @@ gi.require_version("Gtk", "3.0")
 
 from gi.repository import Gtk  # noqa: E402
 
-from endless_war.app.view_model import ProvinceCell, WorldView  # noqa: E402
-from endless_war.ui.geometry import Cell  # noqa: E402
+from endless_war.app.view_model import WorldView  # noqa: E402
+from endless_war.ui import iso  # noqa: E402
+from endless_war.ui.colors import faction_rgb  # noqa: E402
 from endless_war.ui.map_view import (  # noqa: E402
     BACKGROUND,
+    SUPPLY_ALPHA,
+    WASH_ALPHA,
     _army,
-    _bound_outline,
+    _blit,
     _capital,
-    _fill,
+    _face,
     _hatch,
+    _outline,
+    _wash,
 )
+from endless_war.ui.terrain import load_sheet, tile_for  # noqa: E402
 
 PAD = 8
 ROW = 24
-SWATCH = 18
+TERRAIN_ROW = 30
+THUMB_W = 48  # the terrain thumbnail column; symbol swatches centre in it
+SWATCH_S = 0.5  # symbol swatches are a half-size tile face
 TEXT_RGB = (0.85, 0.85, 0.85)
+HEADING_RGB = (0.60, 0.61, 0.64)
+GROUND_RGB = (0.0, 0.0, 0.0)
 FONT_SIZE = 12
 NEUTRAL_KEY = "grey"
-# Capitals and armies are sized relative to their cell; on an 18px swatch
-# they would be specks. Paint them on a larger cell, the largest whose
-# capital diamond (0.22 of the cell, each way) still fits inside a swatch.
-SYMBOL_CELL = 36.0
+TERRAIN_ORDER = ("plains", "forest", "hills", "mountain", "urban")
 
 
 @dataclass(frozen=True, slots=True)
 class LegendEntry:
-    kind: str  # faction | bound | contested | supply | capital | army
+    kind: str  # faction | bound | contested | supply | capital | army | heading | terrain
     label: str
     color_key: str
+    terrain: str = ""
 
 
 def legend_entries(view: WorldView) -> list[LegendEntry]:
-    """Faction colours first, then what each map symbol means."""
+    """Faction colours, then what each map symbol means, then the terrains."""
     entries = [LegendEntry("faction", f.name, f.color_key) for f in view.factions]
     bound = next((f for f in view.factions if f.id == view.bound_faction_id), None)
     if bound is not None:
@@ -56,50 +65,63 @@ def legend_entries(view: WorldView) -> list[LegendEntry]:
         LegendEntry("supply", "Supply problem", NEUTRAL_KEY),
         LegendEntry("capital", "Capital", NEUTRAL_KEY),
         LegendEntry("army", "Army present", NEUTRAL_KEY),
+        LegendEntry("heading", "Terrain", NEUTRAL_KEY),
     ]
+    entries += [LegendEntry("terrain", t.capitalize(), NEUTRAL_KEY, t) for t in TERRAIN_ORDER]
     return entries
 
 
+def row_height(entry: LegendEntry) -> int:
+    return TERRAIN_ROW if entry.kind == "terrain" else ROW
+
+
 def legend_height(view: WorldView) -> int:
-    return 2 * PAD + len(legend_entries(view)) * ROW
+    return 2 * PAD + sum(row_height(e) for e in legend_entries(view))
 
 
-def _province(entry: LegendEntry) -> ProvinceCell:
-    return ProvinceCell(
-        id=0,
-        name="",
-        owner_faction_id=None,
-        controller_faction_id=None,
-        color_key=entry.color_key,
-        is_capital=False,
-        is_contested=False,
-        has_armies=False,
-        has_supply_problem=entry.kind == "supply",
-        terrain="plains",
-    )
+def _row_top(entries: list[LegendEntry], index: int) -> int:
+    return PAD + sum(row_height(e) for e in entries[:index])
 
 
-def _symbol_cell(swatch: Cell, anchor: float) -> Cell:
-    """A map-sized cell placed so its `anchor` point is the swatch centre."""
-    cx = swatch.x + swatch.width / 2
-    cy = swatch.y + swatch.height / 2
-    return Cell(cx - anchor * SYMBOL_CELL, cy - anchor * SYMBOL_CELL, SYMBOL_CELL, SYMBOL_CELL)
+def _swatch_origin(entries: list[LegendEntry], index: int) -> tuple[float, float]:
+    """Top-left of the half-size tile cell whose face is centred in the row."""
+    s = SWATCH_S
+    top = _row_top(entries, index)
+    face_mid = (iso.FACE_TOP + iso.FACE_H / 2) * s
+    return PAD + (THUMB_W - iso.TILE_W * s) / 2, top + ROW / 2 - face_mid
 
 
-def _swatch(cr, swatch: Cell, entry: LegendEntry) -> None:
-    province = _province(entry)
-    cr.save()
-    cr.rectangle(swatch.x, swatch.y, swatch.width, swatch.height)
-    cr.clip()
-    _fill(cr, swatch, province)
-    if entry.kind == "contested":
-        _hatch(cr, swatch)
+def swatch_centre(entries: list[LegendEntry], index: int) -> tuple[float, float]:
+    x, y = _swatch_origin(entries, index)
+    return x + iso.FACE_W / 2 * SWATCH_S, y + (iso.FACE_TOP + iso.FACE_H / 2) * SWATCH_S
+
+
+def _symbol(cr, entry: LegendEntry, x: float, y: float) -> None:
+    s = SWATCH_S
+    _face(cr, x, y, s)
+    cr.set_source_rgb(*GROUND_RGB)
+    cr.fill()
+    rgb = faction_rgb(entry.color_key)
+    if entry.kind in ("faction", "bound"):
+        _wash(cr, x, y, s, rgb, WASH_ALPHA)
+    if entry.kind == "bound":
+        _outline(cr, x, y, s, rgb)
+    elif entry.kind == "contested":
+        _hatch(cr, x, y, s)
+    elif entry.kind == "supply":
+        _wash(cr, x, y, s, (0.0, 0.0, 0.0), SUPPLY_ALPHA)
     elif entry.kind == "capital":
-        _capital(cr, _symbol_cell(swatch, 0.5))
+        _capital(cr, x, y, s)
     elif entry.kind == "army":
-        _army(cr, _symbol_cell(swatch, 0.78))
-    elif entry.kind == "bound":
-        _bound_outline(cr, swatch, province)
+        _army(cr, x, y, s)
+
+
+def _thumbnail(cr, sheet, terrain: str, top: float) -> None:
+    # The top face and a little of the tall features above it, clipped to the row.
+    cr.save()
+    cr.rectangle(PAD, top, THUMB_W, TERRAIN_ROW)
+    cr.clip()
+    _blit(cr, sheet, tile_for(terrain, 0), PAD, top - 12, 1)
     cr.restore()
 
 
@@ -110,11 +132,18 @@ def render_legend(cr, view: WorldView, width: float, height: float) -> None:
     cr.fill()
     cr.select_font_face("Sans")
     cr.set_font_size(FONT_SIZE)
-    for row, entry in enumerate(legend_entries(view)):
-        top = PAD + row * ROW
-        _swatch(cr, Cell(PAD, top, SWATCH, SWATCH), entry)
-        cr.set_source_rgb(*TEXT_RGB)
-        cr.move_to(PAD + SWATCH + 8, top + SWATCH / 2 + FONT_SIZE * 0.35)
+    sheet = load_sheet()
+    entries = legend_entries(view)
+    text_x = PAD + THUMB_W + 8
+    for index, entry in enumerate(entries):
+        top = _row_top(entries, index)
+        h = row_height(entry)
+        if entry.kind == "terrain":
+            _thumbnail(cr, sheet, entry.terrain, top)
+        elif entry.kind != "heading":
+            _symbol(cr, entry, *_swatch_origin(entries, index))
+        cr.set_source_rgb(*(HEADING_RGB if entry.kind == "heading" else TEXT_RGB))
+        cr.move_to(PAD if entry.kind == "heading" else text_x, top + h / 2 + FONT_SIZE * 0.35)
         cr.show_text(entry.label)
 
 
