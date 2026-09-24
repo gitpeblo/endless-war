@@ -504,3 +504,44 @@ The map is an isometric board built from newc-42's "Pixel Art Isometric Map Tile
 - Darkening the sheet costs one Python pass over its pixels at first draw: 66 ms, measured.
 - The legend's terrain section makes the side column taller than the default 640 px window, so the side column scrolls.
 - Zoom (scroll wheel) and pan (middle-button drag) were added at the user's request. Zoom moves in whole-scale steps from the fitted scale up to 8×, anchored at the cursor; zooming back down to the fitted scale recentres and clears the pan; panning is clamped on the board's diamond, not its bounding box (whose empty corners let the map vanish, per the final review): the diamond's point nearest the widget centre stays at least 48 px inside. A resize drops a camera at or below the new fit and re-clamps any other. Smooth-scroll deltas accumulate, so a touchpad swipe zooms one step per unit of scroll, not per event. The state lives in `MapView`, never in the simulation.
+
+
+## 2026-09-24 — War model: land defends itself, reserves reinforce, wars end, factions die
+
+**Decision:**
+The war model was redesigned after the user reported that isolated provinces were never conquered and factions never destroyed (specs: `docs/superpowers/specs/2026-09-24-war-mechanics-design.md` and `2026-09-24-war-model-redesign.md`). It adds: idle-army routing to the front, attack decisions by combat strength, defender retreat and surrender, a one-day occupation, faction elimination, peace settlement of occupied land, province garrisons, war weariness and capitulation, up to two concurrent wars, declaration strength by combat power and usable reserves, broken armies falling back to supply, and reinforcement of armies from reserves. `python3 -m endless_war.measure` runs the ten-year gate.
+
+**Reason — what the diagnosis found, in order:**
+- Every idle army went to the lowest-numbered threatened province, so reserves stacked in one place and most of the front was never attacked (faction 3's armies sat in provinces 1 and 7 while empty enemy provinces next to them stayed untaken for years).
+- Headcount made a broken 158,000-man stack at zero organization look impregnable (the 2026-09-23 "absorbing state").
+- With those fixed, **land had no defence of its own**: armies raided each other's empty provinces in deterministic circles (13,927 captures from 6 battles at seed 42), and captures kept every war alive. Three fixes on top failed, so the model was changed: garrisons make land cost fighting.
+- The underlying cause of the frozen map was the ledgered **reinforcement gap**: destroyed armies were never replaced, so over a decade every side bled its field armies away (at seed 99 a faction held 29 provinces and a million reserves with no army). The 2026-09-23 log said to fix it first; it is fixed.
+
+**Measured (ten years):** before (the old mechanics, with the corrected island metric):
+
+| seed | battles | battle_years | captures | captures_per_battle | map_changes | largest_share | wars_ended | eliminated |
+|---|---|---|---|---|---|---|---|---|
+| 42 | 60 | 6 | 620 | 10.33 | 6 | 0.52 | 24 | {} |
+| 7 | 146 | 8 | 475 | 3.25 | 6 | 0.49 | 29 | {} |
+| 99 | 235 | 10 | 993 | 4.23 | 9 | 0.47 | 47 | {} |
+
+after:
+
+| seed | battles | battle_years | captures | captures_per_battle | map_changes | largest_share | longest_enclave_days | wars_ended | eliminated |
+|---|---|---|---|---|---|---|---|---|---|
+| 42 | 1707 | 10 | 88 | 0.05 | 9 | 0.49 | 1536 | 49 | {4: 7} |
+| 7 | 1707 | 10 | 99 | 0.06 | 9 | 0.41 | 2751 | 51 | {2: 8} |
+| 99 | 1607 | 10 | 120 | 0.07 | 9 | 0.47 | 1454 | 57 | {4: 6} |
+
+The gate (no enemy-surrounded island over 180 days, at most 3 captures per battle, the map changing in at least 6 of 9 year transitions, under 2000 events, no faction over 70 % of the map, clean invariants, 10-year CLI under 6 s) **passes on all three seeds**; the 10-year CLI run takes 5.45 s. Enclaves (a lone cell surrounded by other factions, at war or not, the user's report) last at most 1,454 to 2,751 days, against the whole decade before; they are now finished by a later war rather than never.
+
+**Alternatives considered:**
+- *Quality scoring or defender retreat alone* (2026-09-23): each was reverted then; they are in, but only work with routing, garrisons and reinforcement.
+- *A fallback supply source:* still refused. A rump state that lost its capital and industry cannot project force; its unusable reserves no longer make it look strong, so its neighbours now finish it.
+- *Rebellion / new factions:* out of scope. One faction may eventually own the map; within a decade the largest peaks at 41 to 49 %.
+
+**Consequences:**
+- New `[balance]` keys: `occupation_ticks`, `garrison_per_capita` (0.01), `garrison_regen_per_tick`, `occupied_garrison_factor`, `garrison_loss_multiplier` (8.0), `war_weariness_per_tick`, `capitulation_land_fraction`, `max_concurrent_wars`, `reinforcement_rate_per_tick`, `min_field_armies`, `new_army_share`. Garrison values were calibrated once against the gate (the first values made sieges take ~150 ticks against ~15 for an attacker to break); no pre-existing `[balance]` value was changed.
+- `peace_exhaustion_threshold` is no longer dead config: war weariness makes it reachable.
+- Ownership now changes at peace (`diplomacy._settle`); `test_long_run` checks that a landless faction is eliminated instead of that every faction owns land.
+- This closes the 2026-09-23 "linked pair" (quality scoring with churn) and "absorbing state" notes.

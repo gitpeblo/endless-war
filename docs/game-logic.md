@@ -180,6 +180,41 @@ cumulative casualties, sorted by id. The cadence is by date, not by tick count,
 so a day-sized catch-up tick still records exactly one reading per day. Readings
 are frozen and kept forever (about 36,500 in a century). The History tab draws them.
 
+## 12. The war model (2026-09-24)
+
+How a war is fought and finished, across `ai/strategic.py`, `systems/garrison.py`,
+`systems/battle.py`, `systems/control.py`, `systems/economy.py` and
+`systems/diplomacy.py`.
+
+- **Garrisons.** Every province defends itself with `population × garrison_per_capita × terrain`
+  strength, in effective-power units; an occupier's garrison is `occupied_garrison_factor` of that.
+  An army hostile to the controller fights the garrison as a battle, even with no defending army;
+  the garrison takes `garrison_loss_multiplier` times the normal defender losses, and regrows by
+  `garrison_regen_per_tick` of its cap while no enemy stands in the province.
+- **Occupation.** Only once the garrison is below 10 % of its cap can the province be occupied, and
+  then only by one faction holding it alone for `occupation_ticks` (a day). Leaving or being
+  contested resets it.
+- **Where armies go.** A broken army falls back (to supply, if it cannot recover where it stands).
+  An army occupying a province holds it. Otherwise it attacks, in priority order: an enemy on its own
+  land, a beatable enemy army, beatable enemy land ("beatable": the target's hostile armies plus
+  garrison, in effective power, are under `attack_strength_ratio` × its own). An idle army marches
+  along its own land toward the front sector under most pressure, and each army sent lowers that
+  sector's pressure, so reserves spread along the front.
+- **Retreat and surrender.** A broken attacker or defender falls back to a friendly neighbour; a
+  broken army sharing a province with an enemy and with nowhere to go surrenders.
+- **Reinforcement.** Each tick `reinforcement_rate_per_tick` of the reserve pool flows into armies on
+  supplied own land; a faction with fewer than `min_field_armies` raises a fresh army of
+  `new_army_share` of its reserves at its capital (or best-supplied province).
+- **Declaring war.** Up to `max_concurrent_wars` at once, against a bordering faction it is not yet
+  fighting, when its strength (armies by effective power, plus a quarter of the reserves scaled by
+  the share of its land that is supplied) is `war_declaration_strength_ratio` × the target's.
+- **Ending war.** Exhaustion also grows by `war_weariness_per_tick` while at war. A war ends when all
+  sides are exhausted, after 480 ticks without a capture, when a side has capitulated (lost its
+  capital and fallen below `capitulation_land_fraction` of its pre-war land), or when a side has been
+  destroyed. At its end, occupied land becomes the occupier's unless the owner is still at war with it.
+- **Elimination.** A faction that controls no province is destroyed: its armies disband and it leaves
+  every war. It stays in the records for the history chart.
+
 ## Invariants — `simulation/invariants.py`
 
 After any tick the world must satisfy: province count unchanged, every province
