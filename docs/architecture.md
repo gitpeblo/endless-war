@@ -50,6 +50,14 @@ Practical notes:
 - Use `AyatanaAppIndicator3`, not the legacy `AppIndicator3` — the latter is not installed on Ubuntu 24.04.
 - Nothing needs installing on the current machine, but PyGObject is a system dist-package: a virtualenv needs `--system-site-packages` to see it.
 
+### The `ui/` package
+
+`src/endless_war/ui/` is the War Room: a GTK 3 window (`app.py`) with a cairo-drawn province map (`map_view.py`), a legend drawn with the map's own cell painters (`legend.py`), a status panel and event feed, and an Ayatana tray indicator (`tray.py`). A `GLib.timeout_add` timer on the GTK thread pulls `SimulationService.latest_view()` every 250 ms and repaints; buttons and tray items only `submit()` commands. No widget method is ever called from the simulation thread, and the timer callback has an exception boundary, because GLib silently drops a timeout source whose callback raises.
+
+Everything worth testing is a pure function with no display: `colors.py`, `geometry.py` (province id ↔ grid cell), `panels.py` (text formatting), and the `render_map` / `render_legend` functions, which draw on any cairo context. The widgets are a thin shell around them.
+
+**Import rule:** `ui/` imports `app/` and nothing else from the project. `ui/app.py`'s `main()` imports `generate_world` locally so the module-scope import graph stays UI-only.
+
 ## Determinism
 All random decisions should use a seeded RNG owned by simulation state or simulation context.
 

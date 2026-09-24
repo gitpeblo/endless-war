@@ -6,7 +6,16 @@ The game simulates multiple AI-controlled factions, shifting front lines, logist
 
 ## Running it
 
-There is no graphical interface yet. Run the simulation from the repository root:
+The War Room window shows the map, a status panel (the whole world, or one faction with `--faction`), a legend and the event feed, and keeps running in the tray when you close it:
+
+```bash
+./scripts/run_gui.sh                                  # watch, seed 42, 1x (a 6-hour tick per second)
+./scripts/run_gui.sh --faction 0 --speed 16x --seed 7 # follow faction 0, fast
+```
+
+It uses the system GTK 3 and Ayatana indicator packages that Ubuntu MATE already ships. Quit from the tray menu; closing the window only hides it.
+
+For a headless run that prints a yearly report instead:
 
 ```bash
 ./scripts/run_cli.sh                        # 10 simulated years, seed 42

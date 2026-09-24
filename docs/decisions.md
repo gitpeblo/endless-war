@@ -421,3 +421,26 @@ The application service layer (`src/endless_war/app/`) publishes immutable `Worl
 - A tick that raises an exception sets a fault message and publishes a faulted view. The service stops ticking thereafter. There is currently no mechanism to clear a fault — a faulted service must be stopped and restarted (a process-level action). This is acceptable for the headless observatory and will be addressed by persistence (which knows how to load from a checkpoint, implicitly skipping the fault).
 - Offline catch-up across process restarts is **not** provided by the application layer. It requires knowledge of when the process last stopped, which only persistence (with a save file and its modification time, or a boot log) can provide. The headless core handles a restart as a new game — see `max_offline_days_per_startup` in config.
 - The simulation thread is single-threaded and single-instance per `SimulationService`. Starting a service twice on the same world state will deadlock or corrupt state; this is by design, not a limitation — one world, one thread.
+
+## 2026-09-23 — GTK shell: a polled, thin window over the service
+
+**Decision:**
+The War Room polls `SimulationService.latest_view()` from a 250 ms `GLib.timeout_add` timer on the GTK thread; the simulation thread never touches GTK. The first map draws provinces as flat rectangles on a grid laid out by id, not as polygons. All logic lives in pure functions (colours, grid geometry, text formatting, cairo rendering onto any context) and the widgets are a thin shell, so the suite stays testable without a display. The tray shows Save as a disabled item rather than hiding it.
+
+**Reason:**
+- Polling needs no cross-thread signalling: the service already publishes immutable views, so the UI simply reads the newest one. Pushing from the simulation thread would need `GLib.idle_add` marshalling on every tick and would couple the tick rate to redraw cost; at 16× the service ticks far faster than a window can usefully repaint.
+- Worldgen has no province shapes, only ids on a grid. Polygons would mean inventing geography the simulation does not have. Rectangles show ownership, contested ground, capitals, armies and supply faithfully.
+- Only the widget layer needs an X display. `render_map` is tested pixel by pixel against a cairo image surface, and the formatters against plain views.
+- A disabled Save says that saving is coming and not yet there; a missing one reads as an oversight.
+
+**Alternatives considered:**
+- *Push views with `GLib.idle_add` from the simulation thread.* Rejected for the coupling above, and because an exception in that path would sit on the simulation thread.
+- *Province polygons (Voronoi or hand-drawn).* Deferred until worldgen produces geography worth drawing.
+- *Hide Save until persistence exists.* Rejected as above.
+
+**Consequences:**
+- A view can be up to 250 ms stale. That is invisible at every speed.
+- An exception in the refresh path is caught, printed to stderr and shown in the header as `UI FAULT: …`, and the timer keeps running. Found in review: GLib drops a timeout source whose callback raises, which would freeze the window with only a stderr trace.
+- Found by running it: the toolbar buttons do not take keyboard focus. Presenting the window from the tray handed focus to the 1x button, so a space typed into another app at that moment changed the speed. The tray menu is the keyboard route to the same controls.
+- The event feed is shown newest-first, because its scroller opens at the top.
+- The map legend paints its swatches with the map's own cell painters, so it cannot drift from what the map shows.
