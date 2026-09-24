@@ -8,7 +8,7 @@ Phase: 6, pulled forward from sub-project D at the user's request
 
 The War Room (sub-project C, merged) has one view: the map. The user asked for
 two tabs, **Map** and **History**, with the History tab opening on "the time
-series of the death toll, toggleable per faction". `specs/02-ui-and-tray.md`
+series of the death toll, toggleable per faction". `docs/superpowers/specs/02-ui-and-tray.md`
 lists History as tab 6 of 8; the other six tabs stay in sub-project D.
 
 Nothing in the simulation keeps a history today. `Faction.casualties` is a

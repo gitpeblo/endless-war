@@ -4,9 +4,9 @@ This file provides guidance to coding agents (Claude Code, Codex, and others) wh
 
 ## What this repository currently is
 
-A **spec-first skeleton**, not a working game. `src/endless_war/` is ~140 lines of placeholders: dataclasses with no behavior, a `SimulationEngine.tick()` that only advances the clock past a list of `TODO` comments, and `ui/`, `persistence/`, `ai/` modules that intentionally raise or return empty. The real content of the repo is in `specs/` (authoritative product + game design) and `docs/` (architecture, algorithms, rules). Read those before writing code — implementation decisions are already made there.
+A **spec-first skeleton**, not a working game. `src/endless_war/` is ~140 lines of placeholders: dataclasses with no behavior, a `SimulationEngine.tick()` that only advances the clock past a list of `TODO` comments, and `ui/`, `persistence/`, `ai/` modules that intentionally raise or return empty. The real content of the repo is in `docs/superpowers/specs/` (the numbered `00-`…`04-` files are the authoritative product + game design; the dated `*-design.md` files are per-feature designs) and `docs/` (architecture, algorithms, rules). Read those before writing code — implementation decisions are already made there.
 
-Reading order for a new session: `README.md` → `specs/00-project-brief.md` → `specs/01-game-design.md` → `specs/03-mvp.md` → `docs/architecture.md` → `docs/development-rules.md`, then `docs/decisions.md` for anything decided in a prior session.
+Reading order for a new session: `README.md` → `docs/superpowers/specs/00-project-brief.md` → `docs/superpowers/specs/01-game-design.md` → `docs/superpowers/specs/03-mvp.md` → `docs/architecture.md` → `docs/development-rules.md`, then `docs/decisions.md` for anything decided in a prior session.
 
 ## Commands
 
@@ -43,4 +43,4 @@ These are non-negotiable and already specified in `docs/architecture.md` and `do
 
 ## Scope discipline
 
-`CONTINUE_OFFLINE.md` and `specs/04-roadmap.md` set the sequencing, and it is deliberate: **build a headless autonomous simulation before any GTK or tray work.** The stated checkpoint is 5 factions, ~100 provinces, several armies, 10 simulated years under AI control, printing yearly territory/population/casualties/major events, with wars that start, fronts that move, wars that end, and no numeric explosions. Graphics, tray polish, diplomacy, commanders, and doctrine come after that loop is demonstrably interesting. `specs/03-mvp.md` lists what is explicitly deferred — do not pull deferred features forward without being asked.
+`CONTINUE_OFFLINE.md` and `docs/superpowers/specs/04-roadmap.md` set the sequencing, and it is deliberate: **build a headless autonomous simulation before any GTK or tray work.** The stated checkpoint is 5 factions, ~100 provinces, several armies, 10 simulated years under AI control, printing yearly territory/population/casualties/major events, with wars that start, fronts that move, wars that end, and no numeric explosions. Graphics, tray polish, diplomacy, commanders, and doctrine come after that loop is demonstrably interesting. `docs/superpowers/specs/03-mvp.md` lists what is explicitly deferred — do not pull deferred features forward without being asked.

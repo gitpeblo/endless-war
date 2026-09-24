@@ -1,7 +1,8 @@
 """War exhaustion, declarations, and peace.
 
-specs/01-game-design.md requires that individual wars end while the world does
-not. Peace triggers on mutual exhaustion or on a stalemate with no captures.
+docs/superpowers/specs/01-game-design.md requires that individual wars end
+while the world does not. Peace triggers on mutual exhaustion or on a
+stalemate with no captures.
 """
 
 from __future__ import annotations

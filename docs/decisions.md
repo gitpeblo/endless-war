@@ -17,7 +17,7 @@ Format:
 ## 2026-09-22 — Desktop UI stack: GTK 3 via PyGObject, with Ayatana AppIndicator for the tray
 
 **Decision:**
-The graphical interface is GTK 3 accessed from Python through PyGObject (`gi`), and the Ubuntu MATE tray icon uses the `AyatanaAppIndicator3` GObject-Introspection namespace. This confirms the stack already suggested in `README.md` and `specs/04-roadmap.md` (Phase 6); it is recorded here so it is not re-litigated.
+The graphical interface is GTK 3 accessed from Python through PyGObject (`gi`), and the Ubuntu MATE tray icon uses the `AyatanaAppIndicator3` GObject-Introspection namespace. This confirms the stack already suggested in `README.md` and `docs/superpowers/specs/04-roadmap.md` (Phase 6); it is recorded here so it is not re-litigated.
 
 **Reason:**
 - MATE is a GTK 3 desktop, so GTK 3 is the native toolkit for the target platform and needs no extra runtime.
@@ -27,7 +27,7 @@ The graphical interface is GTK 3 accessed from Python through PyGObject (`gi`), 
 **Alternatives considered:**
 - *GTK 4* — not available on this machine (`Gtk 4.0` namespace is absent; only 3.24.41 is installed) and not the MATE-native version. Would require pulling in a newer toolkit for no benefit to a province-map view.
 - *Legacy `AppIndicator3` (Canonical libappindicator)* — the namespace is **not** installed here; Ubuntu 24.04 ships the Ayatana fork instead. Code must require `AyatanaAppIndicator3`, not `AppIndicator3`.
-- *Qt/PySide, Tk, or a web UI* — would add a large dependency, and a browser/Electron shell conflicts with the low-attention, tray-resident design pillar in `specs/00-project-brief.md`.
+- *Qt/PySide, Tk, or a web UI* — would add a large dependency, and a browser/Electron shell conflicts with the low-attention, tray-resident design pillar in `docs/superpowers/specs/00-project-brief.md`.
 
 **Consequences:**
 - No installation is required for development on this machine. Verified present:
@@ -97,7 +97,7 @@ ten-year observation run (`python -m endless_war --years 10 --seed 42`):
   that has lost its capital and every industrial centre being unable to project
   force is an explainable consequence, not a bug. Ruled: the consequence stays.
 - **No manpower demobilisation or treasury sink in this branch.**
-  `specs/03-mvp.md` defers that depth and the checkpoint is met without it.
+  `docs/superpowers/specs/03-mvp.md` defers that depth and the checkpoint is met without it.
   **Consequence, stated plainly so nobody tunes it blind:
   `peace_exhaustion_threshold` (0.75) is currently DEAD CONFIG.** Measured peak
   exhaustion for any faction across the whole decade is **0.0434** -- about 6% of
@@ -151,7 +151,7 @@ ten-year observation run (`python -m endless_war --years 10 --seed 42`):
 - *Raw power ratio for battle losses* — rejected as unbounded (above).
 - *Deterministic winner-takes-all battle resolution* — rejected: it produces
   step-function fronts rather than the attritional give-and-take
-  `specs/01-game-design.md` asks for, and it makes casualties uninformative.
+  `docs/superpowers/specs/01-game-design.md` asks for, and it makes casualties uninformative.
 - *Exponential recruitment with a hard cap* — rejected: the cap becomes the only
   thing that matters, and every faction sits pinned at it within months.
 - *Lowering `war_declaration_strength_ratio` from 1.35 at the checkpoint* — this

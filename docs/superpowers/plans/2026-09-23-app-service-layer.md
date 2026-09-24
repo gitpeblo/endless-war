@@ -169,7 +169,7 @@ from datetime import datetime
 
 @dataclass(frozen=True, slots=True)
 class ProvinceCell:
-    """One province as the map needs it (specs/02-ui-and-tray.md)."""
+    """One province as the map needs it (docs/superpowers/specs/02-ui-and-tray.md)."""
 
     id: int
     name: str

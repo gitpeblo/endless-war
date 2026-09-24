@@ -18,7 +18,7 @@ thread. This document specifies that machinery. It contains no GTK code.
 
 ## Phase 6 decomposition
 
-`specs/02-ui-and-tray.md` describes eight tabs, a seven-field tray summary,
+`docs/superpowers/specs/02-ui-and-tray.md` describes eight tabs, a seven-field tray summary,
 seven tray actions, a strategic map and a notification system. That is several
 projects. Phase 6 is therefore built as four sub-projects, each with its own
 spec, plan and implementation cycle:
@@ -40,7 +40,7 @@ Decisions taken during design, recorded so they are not re-litigated:
   a faction or unbound. Bound, the status panel and tray summary describe that
   faction; unbound, they describe the world. Neither mode offers control levers
   — the player's actual strategy inputs are roadmap Phase 7. This satisfies the
-  tray summary in `specs/02-ui-and-tray.md` while honouring the architectural
+  tray summary in `docs/superpowers/specs/02-ui-and-tray.md` while honouring the architectural
   requirement that the simulation stay valid with no player selected.
 - **Purpose-built frozen view model**, not a deep copy of `WorldState` and not
   shared state under a lock. See "Why not the alternatives" below.
@@ -94,7 +94,7 @@ views never reach past this interface into `WorldState`.
 flag, the bound faction id (or `None`), a `ProvinceCell` per province, a
 `FactionRow` per faction, the most recent `EventLine`s, and active/total war
 counts. `ProvinceCell` carries what the map must communicate per
-`specs/02-ui-and-tray.md` — controller, owner, contested state, whether armies
+`docs/superpowers/specs/02-ui-and-tray.md` — controller, owner, contested state, whether armies
 are present, capital status and a supply-problem flag — as plain values, not
 object references.
 

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, stdlib only (`dataclasses`, `random`, `tomllib`, `datetime`, `collections.deque`), pytest 8 for tests. No third-party runtime dependencies.
 
-**Spec:** `specs/00-project-brief.md`, `specs/01-game-design.md`, `specs/03-mvp.md`, `docs/architecture.md`, `docs/data-model.md`, `docs/simulation-notes.md`, `docs/development-rules.md`, `CONTINUE_OFFLINE.md`
+**Spec:** `docs/superpowers/specs/00-project-brief.md`, `docs/superpowers/specs/01-game-design.md`, `docs/superpowers/specs/03-mvp.md`, `docs/architecture.md`, `docs/data-model.md`, `docs/simulation-notes.md`, `docs/development-rules.md`, `CONTINUE_OFFLINE.md`
 
 ## Global Constraints
 
@@ -25,7 +25,7 @@
 
 ## Out of Scope for This Plan
 
-`specs/03-mvp.md` lists the full prototype. This plan stops at the `CONTINUE_OFFLINE.md`
+`docs/superpowers/specs/03-mvp.md` lists the full prototype. This plan stops at the `CONTINUE_OFFLINE.md`
 checkpoint and deliberately leaves the following MVP items unbuilt — do not add them here:
 
 | MVP item | Why it is not in this plan |
@@ -34,7 +34,7 @@ checkpoint and deliberately leaves the following MVP items unbuilt — do not ad
 | Pause / speed controls | A wall-clock concern of the application-services layer, not the tick pipeline. |
 | Save / load, SQLite schema | Roadmap Phase 5. The world is in-memory only for this slice. |
 | Main window, tray, map rendering | Roadmap Phase 6, gated behind this checkpoint being interesting. |
-| Commanders, doctrine, civil wars, tech | `specs/03-mvp.md` explicitly defers them. |
+| Commanders, doctrine, civil wars, tech | `docs/superpowers/specs/03-mvp.md` explicitly defers them. |
 
 
 ---
@@ -1911,7 +1911,7 @@ And extend `WorldState` with:
 # src/endless_war/simulation/systems/diplomacy.py
 """War exhaustion, declarations, and peace.
 
-specs/01-game-design.md requires that individual wars end while the world does
+docs/superpowers/specs/01-game-design.md requires that individual wars end while the world does
 not. Peace triggers on mutual exhaustion or on a stalemate with no captures.
 """
 
@@ -2363,7 +2363,7 @@ And extend `WorldState`:
 # src/endless_war/simulation/systems/events.py
 """Event log.
 
-specs/02-ui-and-tray.md: only surface events that matter. The thresholds here
+docs/superpowers/specs/02-ui-and-tray.md: only surface events that matter. The thresholds here
 are the first line of defence against a log nobody can read.
 """
 
@@ -2826,5 +2826,5 @@ git commit -m "docs: record simulation core balance decisions"
 
 - **Run the full suite after every task**, not just the new file. The long-run test in Task 12 is the canary: a change that passes its own unit tests but breaks the 10-year run has broken the simulation.
 - **If a formula produces boring history, tune `config/default.toml` first.** Only change code if the *shape* of the model is wrong, and say so in `docs/decisions.md`.
-- **Do not add persistence, GTK, commanders, or diplomacy beyond war/peace.** `specs/03-mvp.md` defers them, and this plan stops at the `CONTINUE_OFFLINE.md` checkpoint.
+- **Do not add persistence, GTK, commanders, or diplomacy beyond war/peace.** `docs/superpowers/specs/03-mvp.md` defers them, and this plan stops at the `CONTINUE_OFFLINE.md` checkpoint.
 - The pipeline order in `SimulationEngine.tick()` is fixed by `docs/architecture.md`. If a task seems to need a different order, that is a finding to raise, not a change to make quietly.

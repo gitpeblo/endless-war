@@ -56,7 +56,7 @@ For the exact formulas and the config values that tune them, see
 
 ## Repository layout
 
-- `specs/` — authoritative product and game specifications
+- `docs/superpowers/specs/` — the authoritative product and game specifications (`00-`…`04-`) and the dated per-feature designs
 - `docs/` — architecture, algorithms, decisions, and implementation notes
 - `src/endless_war/` — application source tree
 - `tests/` — automated tests
@@ -81,4 +81,4 @@ For the exact formulas and the config values that tune them, see
 
 The first playable prototype should run a 4–6 faction war on a simple province graph, display territory/front changes, log important events, save/load correctly, and require no player interaction to continue.
 
-See `specs/00-project-brief.md` and `specs/01-game-design.md` first.
+See `docs/superpowers/specs/00-project-brief.md` and `docs/superpowers/specs/01-game-design.md` first.

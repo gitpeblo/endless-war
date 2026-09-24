@@ -1,7 +1,7 @@
 """Event log.
 
-specs/02-ui-and-tray.md: only surface events that matter. The thresholds here
-are the first line of defence against a log nobody can read.
+docs/superpowers/specs/02-ui-and-tray.md: only surface events that matter. The
+thresholds here are the first line of defence against a log nobody can read.
 """
 
 from __future__ import annotations

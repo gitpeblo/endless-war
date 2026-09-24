@@ -39,10 +39,10 @@ In scope:
 5. A launcher script, and tests for everything that can be tested without a
    display.
 
-Out of scope, explicitly: the seven other tabs from `specs/02-ui-and-tray.md`
+Out of scope, explicitly: the seven other tabs from `docs/superpowers/specs/02-ui-and-tray.md`
 (sub-project D); the notification system (D); persistence and a working Save
 (sub-project B); any player control over the simulation beyond pause and speed
-(roadmap Phase 7); map polish beyond flat rectangles — `specs/02-ui-and-tray.md`
+(roadmap Phase 7); map polish beyond flat rectangles — `docs/superpowers/specs/02-ui-and-tray.md`
 says a first prototype may use a grid and warns against delaying on graphics.
 
 ## Architecture
@@ -141,6 +141,6 @@ not thread-safe, so a push would have to hop threads via `GLib.idle_add` anyway,
 and the service's slot is already latest-wins. Polling is simpler and cannot
 queue up stale frames.
 
-**Flat rectangles** rather than province polygons: `specs/02-ui-and-tray.md`
+**Flat rectangles** rather than province polygons: `docs/superpowers/specs/02-ui-and-tray.md`
 explicitly permits a grid for the first prototype and warns against delaying the
 simulation for map graphics. Polygons need a map generator that does not exist.
