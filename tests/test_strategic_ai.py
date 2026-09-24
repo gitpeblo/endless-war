@@ -119,3 +119,58 @@ def test_broken_army_at_war_in_the_rear_is_not_ordered_to_withdraw() -> None:
 
     update_movement(w, random.Random(1), cfg)
     assert army.organization > 0.20, "and holding must let it recover"
+
+
+def _war_world():
+    cfg = load_config()
+    w = generate_world(seed=42, config=cfg)
+    w.factions[0].at_war_with = {3}
+    w.factions[3].at_war_with = {0}
+    return w, cfg
+
+
+def _rear_province(w, fid, enemy):
+    fronts = {p for p in w.provinces if w.provinces[p].controller_faction_id == fid
+              and any(w.provinces[n].controller_faction_id == enemy for n in w.provinces[p].neighbors)}
+    for pid in sorted(w.provinces):
+        p = w.provinces[pid]
+        if p.controller_faction_id == fid and pid not in fronts and not any(
+            w.provinces[n].controller_faction_id != fid for n in p.neighbors
+        ):
+            return pid
+    raise AssertionError("premise: faction has an interior province")
+
+
+def test_an_idle_army_in_the_rear_steps_toward_the_front() -> None:
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    rear = _rear_province(w, 0, 3)
+    w.armies[1] = Army(id=1, faction_id=0, province_id=rear, manpower=20_000)
+    choose_strategic_actions(w, random.Random(1), cfg)
+    step = w.armies[1].destination_id
+    assert step is not None and step in w.provinces[rear].neighbors
+    assert w.provinces[step].controller_faction_id == 0
+
+
+def test_idle_armies_spread_over_the_front_instead_of_stacking() -> None:
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    rear = _rear_province(w, 0, 3)
+    for aid in range(1, 5):
+        w.armies[aid] = Army(id=aid, faction_id=0, province_id=rear, manpower=20_000)
+    w.armies[9] = Army(id=9, faction_id=3, province_id=next(
+        p for p in sorted(w.provinces) if w.provinces[p].controller_faction_id == 3), manpower=40_000)
+    # From one rear province the first step can be shared even when the
+    # targets differ, so march them and note where each reaches the front
+    # (its first tick with a hostile neighbour, when it stops being idle).
+    arrived: dict[int, int] = {}
+    for _ in range(12):
+        choose_strategic_actions(w, random.Random(1), cfg)
+        for aid in range(1, 5):
+            if aid not in arrived and w.armies[aid].stance != "balanced":
+                arrived[aid] = w.armies[aid].province_id
+        update_movement(w, random.Random(1), cfg)
+    assert len(arrived) == 4, "premise: all four reach the front"
+    assert len(set(arrived.values())) >= 2, f"all four reached the same spot: {arrived}"
