@@ -75,6 +75,18 @@ class Event:
     related_entity_ids: list[int] = field(default_factory=list)
 
 
+@dataclass(frozen=True, slots=True)
+class CasualtyReading:
+    """Every faction's cumulative casualties at one simulated instant.
+
+    Frozen and built from tuples, so a view can share a reading instead of
+    copying it.
+    """
+
+    simulated_at: datetime
+    casualties: tuple[tuple[int, int], ...]  # (faction_id, cumulative), sorted by id
+
+
 @dataclass(slots=True)
 class WorldState:
     seed: int
@@ -88,3 +100,4 @@ class WorldState:
     next_war_id: int = 0
     events: deque[Event] = field(default_factory=deque)
     next_event_id: int = 0
+    casualty_history: list[CasualtyReading] = field(default_factory=list)

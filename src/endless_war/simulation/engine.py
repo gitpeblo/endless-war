@@ -22,6 +22,7 @@ from endless_war.simulation.systems.diplomacy import (
 )
 from endless_war.simulation.systems.economy import update_economy, update_recruitment
 from endless_war.simulation.systems.events import record_events
+from endless_war.simulation.systems.history import record_history
 from endless_war.simulation.systems.movement import update_movement
 from endless_war.simulation.systems.supply import update_supply
 
@@ -58,6 +59,7 @@ class SimulationEngine:
         record_events(
             self.world, self.config, battle_records, capture_records, diplomacy_events
         )
+        record_history(self.world)
         # --- SYSTEM PIPELINE END ---
 
     def run(self, ticks: int) -> None:
