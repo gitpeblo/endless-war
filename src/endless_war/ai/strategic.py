@@ -47,10 +47,20 @@ def _standing_somewhere_safe(world: WorldState, army: Army) -> bool:
     )
 
 
-def _defenders_in(world: WorldState, province_id: int, faction_id: int) -> int:
+def _defence_of(
+    world: WorldState, province_id: int, attacker_faction: int, terrain: dict[str, float]
+) -> float:
+    """The combat strength an attacker would meet: armies there it is at war with.
+
+    Counting raw headcount made a broken 158,000-man stack at zero organization
+    look impregnable, so it was never attacked and its faction never died.
+    """
+    at_war = world.factions[attacker_faction].at_war_with
     return sum(
-        a.manpower for a in world.armies.values()
-        if a.province_id == province_id and a.faction_id != faction_id
+        effective_power(world.armies[aid], world, True, terrain)
+        for aid in sorted(world.armies)
+        if world.armies[aid].province_id == province_id
+        and world.armies[aid].faction_id in at_war
     )
 
 
@@ -147,9 +157,10 @@ def choose_strategic_actions(
 
         hostile = _hostile_neighbours(world, army)
         if hostile:
-            hostile.sort(key=lambda pid: (_defenders_in(world, pid, army.faction_id), pid))
+            hostile.sort(key=lambda pid: (_defence_of(world, pid, army.faction_id, terrain), pid))
             weakest = hostile[0]
-            if _defenders_in(world, weakest, army.faction_id) < army.manpower * attack_ratio:
+            own = effective_power(army, world, False, terrain)
+            if _defence_of(world, weakest, army.faction_id, terrain) < own * attack_ratio:
                 army.stance = "aggressive"
                 army.destination_id = weakest
             else:

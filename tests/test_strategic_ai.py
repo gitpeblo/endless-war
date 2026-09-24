@@ -174,3 +174,28 @@ def test_idle_armies_spread_over_the_front_instead_of_stacking() -> None:
         update_movement(w, random.Random(1), cfg)
     assert len(arrived) == 4, "premise: all four reach the front"
     assert len(set(arrived.values())) >= 2, f"all four reached the same spot: {arrived}"
+
+
+def test_a_broken_stack_does_not_deter_an_attack() -> None:
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    border = next(p for p in sorted(w.provinces) if w.provinces[p].controller_faction_id == 0
+                  and any(w.provinces[n].controller_faction_id == 3 for n in w.provinces[p].neighbors))
+    target = next(n for n in w.provinces[border].neighbors if w.provinces[n].controller_faction_id == 3)
+    w.armies[1] = Army(id=1, faction_id=0, province_id=border, manpower=20_000)
+    w.armies[2] = Army(id=2, faction_id=3, province_id=target, manpower=150_000,
+                       organization=0.0, morale=0.0)
+    choose_strategic_actions(w, random.Random(1), cfg)
+    assert w.armies[1].destination_id == target
+
+
+def test_an_empty_hostile_province_is_always_attackable() -> None:
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    border = next(p for p in sorted(w.provinces) if w.provinces[p].controller_faction_id == 0
+                  and any(w.provinces[n].controller_faction_id == 3 for n in w.provinces[p].neighbors))
+    w.armies[1] = Army(id=1, faction_id=0, province_id=border, manpower=500)
+    choose_strategic_actions(w, random.Random(1), cfg)
+    assert w.provinces[w.armies[1].destination_id].controller_faction_id == 3
