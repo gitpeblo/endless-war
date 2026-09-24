@@ -49,6 +49,7 @@ class FactionRow:
     war_support: float
     stability: float
     at_war_with: tuple[int, ...]
+    eliminated: bool = False
 
 
 @dataclass(frozen=True, slots=True)

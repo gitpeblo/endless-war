@@ -67,20 +67,20 @@ def test_history_accumulated(ten_year_world) -> None:
 def test_no_faction_was_silently_annihilated_by_a_bug(ten_year_world) -> None:
     """No province may leak out of the world by losing its controller.
 
-    The ownership half below can only fail on data corruption, because nothing
-    in the simulation ever mutates `owner_faction_id`. The assertion that bites
-    is the total: every province must be controlled by exactly one live faction,
-    so a province dropping to `None` or to an id that is not in `factions` --
-    annihilation by bug, as opposed to by conquest -- fails here.
+    Every province must be controlled by exactly one live faction, so a
+    province dropping to `None` or to an id that is not in `factions` --
+    annihilation by bug, as opposed to by conquest -- fails here. A faction
+    that holds nothing must have been eliminated, not silently left landless.
+    (Ownership may now change at peace, so it is no longer checked here.)
     """
     controlled_total = 0
     for fid in ten_year_world.factions:
         controlled = [
             p for p in ten_year_world.provinces.values() if p.controller_faction_id == fid
         ]
-        owned = [p for p in ten_year_world.provinces.values() if p.owner_faction_id == fid]
-        assert owned, f"faction {fid} lost its ownership records entirely"
-        controlled_total += len(controlled)  # zero controlled is legitimate: conquest
+        if not controlled:
+            assert ten_year_world.factions[fid].eliminated, f"faction {fid} holds nothing but lives on"
+        controlled_total += len(controlled)
 
     assert controlled_total == ten_year_world.expected_province_count, (
         f"{controlled_total} provinces are controlled by a live faction but the world "

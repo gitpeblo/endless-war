@@ -144,3 +144,43 @@ def test_a_faction_is_never_at_war_with_itself() -> None:
         update_diplomacy(w, rng, cfg)
     for fid, fac in w.factions.items():
         assert fid not in fac.at_war_with
+
+
+def _losing_everything(fid: int = 4, winner: int = 3):
+    import random as _random
+    from endless_war.config import load_config as _load
+    from endless_war.domain.models import War
+    from endless_war.simulation.worldgen import generate_world as _gen
+
+    cfg = _load()
+    w = _gen(seed=42, config=cfg)
+    w.factions[fid].at_war_with = {winner}
+    w.factions[winner].at_war_with = {fid}
+    w.wars[w.next_war_id] = War(id=w.next_war_id, attackers={winner}, defenders={fid},
+                                started_at=w.current_time, last_capture_tick=w.tick_count)
+    w.next_war_id += 1
+    for p in w.provinces.values():
+        if p.controller_faction_id == fid:
+            p.controller_faction_id = winner
+    return w, cfg, _random.Random(1)
+
+
+def test_a_faction_with_no_land_is_eliminated() -> None:
+    from endless_war.simulation.systems.diplomacy import update_diplomacy
+    w, cfg, rng = _losing_everything()
+    assert any(a.faction_id == 4 for a in w.armies.values()), "premise: it has armies"
+    events = update_diplomacy(w, rng, cfg)
+    assert w.factions[4].eliminated
+    assert not any(a.faction_id == 4 for a in w.armies.values())
+    assert w.factions[4].at_war_with == set() and 4 not in w.factions[3].at_war_with
+    assert all(war.status == "ended" for war in w.wars.values() if 4 in war.defenders)
+    assert {"kind": "eliminated", "faction": 4} in events
+
+
+def test_an_eliminated_faction_never_declares_war() -> None:
+    from endless_war.simulation.engine import SimulationEngine
+    w, cfg, _rng = _losing_everything()
+    engine = SimulationEngine(w, cfg)
+    engine.run(400)
+    assert w.factions[4].eliminated
+    assert not any(4 in war.attackers | war.defenders for war in w.wars.values() if war.status == "active")

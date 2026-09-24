@@ -87,6 +87,7 @@ def _faction_rows(world: WorldState) -> tuple[FactionRow, ...]:
                 war_support=faction.war_support,
                 stability=faction.stability,
                 at_war_with=tuple(sorted(faction.at_war_with)),
+                eliminated=faction.eliminated,
             )
         )
     return tuple(rows)

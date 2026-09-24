@@ -49,6 +49,29 @@ def note_captures(world: WorldState, capture_records: list[dict[str, Any]]) -> N
                 war.last_capture_tick = world.tick_count
 
 
+def eliminate_landless(world: WorldState) -> list[dict[str, Any]]:
+    """Eliminate every faction that controls no province.
+
+    Its armies disband (their men count as its casualties) and it leaves every
+    war. It stays in `world.factions` so its history survives.
+    """
+    controlled = {p.controller_faction_id for p in world.provinces.values()}
+    events: list[dict[str, Any]] = []
+    for fid in sorted(world.factions):
+        fac = world.factions[fid]
+        if fac.eliminated or fid in controlled:
+            continue
+        fac.eliminated = True
+        for aid in [aid for aid in sorted(world.armies) if world.armies[aid].faction_id == fid]:
+            fac.casualties += world.armies[aid].manpower
+            del world.armies[aid]
+        for other in sorted(fac.at_war_with):
+            world.factions[other].at_war_with.discard(fid)
+        fac.at_war_with.clear()
+        events.append({"kind": "eliminated", "faction": fid})
+    return events
+
+
 def _strength(world: WorldState, faction_id: int) -> float:
     army = sum(a.manpower for a in world.armies.values() if a.faction_id == faction_id)
     return army + world.factions[faction_id].manpower * 0.5
@@ -75,7 +98,7 @@ def update_diplomacy(
     max_exhaustion: float = config["balance"]["war_declaration_max_exhaustion"]
     peace_exhaustion: float = config["balance"]["peace_exhaustion_threshold"]
     stalemate: int = config["balance"]["peace_stalemate_ticks"]
-    events: list[dict[str, Any]] = []
+    events: list[dict[str, Any]] = eliminate_landless(world)
 
     for war_id in sorted(world.wars):
         war = world.wars[war_id]
@@ -84,7 +107,10 @@ def update_diplomacy(
         involved = sorted(war.attackers | war.defenders)
         worn_out = all(world.factions[f].exhaustion >= peace_exhaustion for f in involved)
         stalled = world.tick_count - war.last_capture_tick > stalemate
-        if not (worn_out or stalled):
+        destroyed = not any(not world.factions[f].eliminated for f in war.attackers) or not any(
+            not world.factions[f].eliminated for f in war.defenders
+        )
+        if not (worn_out or stalled or destroyed):
             continue
         war.status = "ended"
         for a in sorted(war.attackers):
@@ -95,11 +121,12 @@ def update_diplomacy(
             "kind": "peace",
             "attacker": sorted(war.attackers)[0],
             "defender": sorted(war.defenders)[0],
+            "reason": "elimination" if destroyed else "ceasefire",
         })
 
     for fid in sorted(world.factions):
         fac = world.factions[fid]
-        if fac.at_war_with or fac.exhaustion > max_exhaustion:
+        if fac.eliminated or fac.at_war_with or fac.exhaustion > max_exhaustion:
             continue
         if rng.random() > 0.004:
             continue

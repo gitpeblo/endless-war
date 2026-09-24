@@ -42,11 +42,19 @@ def record_events(
     name = lambda fid: world.factions[fid].name if fid in world.factions else "unknown"  # noqa: E731
 
     for event in diplomacy_events:
+        if event["kind"] == "eliminated":
+            _add(world, "diplomacy", "critical", "Faction destroyed",
+                 f"{name(event['faction'])} has been destroyed.", [event["faction"]])
+            continue
         attacker, defender = event["attacker"], event["defender"]
         if event["kind"] == "war_declared":
             _add(world, "diplomacy", "critical", "War declared",
                  f"{name(attacker)} has declared war on {name(defender)}.",
                  [attacker, defender])
+        elif event["kind"] == "peace" and event.get("reason") == "elimination":
+            _add(world, "diplomacy", "critical", "War over",
+                 f"The war between {name(attacker)} and {name(defender)} is over: "
+                 f"one side has been destroyed.", [attacker, defender])
         elif event["kind"] == "peace":
             _add(world, "diplomacy", "critical", "Peace signed",
                  f"{name(attacker)} and {name(defender)} have signed a ceasefire.",

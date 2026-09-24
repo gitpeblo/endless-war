@@ -39,6 +39,7 @@ class Faction:
     casualties: int = 0
     exhaustion_casualty_mark: int = 0
     color_key: str = "grey"
+    eliminated: bool = False  # lost its last province; never returns
 
 
 @dataclass(slots=True)

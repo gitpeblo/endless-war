@@ -28,6 +28,8 @@ def check_invariants(world: WorldState) -> list[str]:
         prov = world.provinces[pid]
         if prov.controller_faction_id not in world.factions:
             violations.append(f"province {pid} controlled by unknown faction")
+        elif world.factions[prov.controller_faction_id].eliminated:
+            violations.append(f"province {pid} controlled by eliminated faction")
         if not math.isfinite(prov.supply_value):
             violations.append(f"province {pid} supply_value is not finite")
         elif not 0.0 <= prov.supply_value <= 1.0:

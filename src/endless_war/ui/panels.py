@@ -19,6 +19,8 @@ def header_text(view: WorldView) -> str:
 
 def _faction_block(view: WorldView, faction_id: int) -> list[tuple[str, str]]:
     faction = next(f for f in view.factions if f.id == faction_id)
+    if faction.eliminated:
+        return [(faction.name, ""), ("destroyed", "")]
     at_war = ", ".join(
         other.name for other in view.factions if other.id in faction.at_war_with
     )

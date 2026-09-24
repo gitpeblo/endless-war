@@ -56,7 +56,9 @@ class LegendEntry:
 
 def legend_entries(view: WorldView) -> list[LegendEntry]:
     """Faction colours, then what each map symbol means, then the terrains."""
-    entries = [LegendEntry("faction", f.name, f.color_key) for f in view.factions]
+    entries = [
+        LegendEntry("faction", f.name, f.color_key) for f in view.factions if not f.eliminated
+    ]
     bound = next((f for f in view.factions if f.id == view.bound_faction_id), None)
     if bound is not None:
         entries.append(LegendEntry("bound", "Your territory", bound.color_key))
