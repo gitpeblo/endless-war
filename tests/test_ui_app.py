@@ -93,3 +93,27 @@ def test_closing_the_window_hides_it_instead_of_quitting() -> None:
     finally:
         room.shutdown()
         service.stop()
+
+
+def test_a_refresh_failure_is_shown_and_does_not_stop_the_timer() -> None:
+    # GLib drops a timeout source whose callback raises, so an uncaught
+    # exception in refresh() would freeze the window forever with only a
+    # stderr traceback. The timer must survive and show the failure.
+    service, cfg = _service()
+    room = WarRoom(service, cols=cfg["world"]["grid_cols"])
+    service.start()
+    try:
+        for _ in range(200):
+            _pump(2)
+            if service.latest_view() is not None:
+                break
+
+        def broken(_view):
+            raise RuntimeError("boom")
+
+        room.map_view.set_view = broken
+        assert room._on_timer() is True
+        assert "UI FAULT: RuntimeError: boom" in room.header.get_text()
+    finally:
+        room.shutdown()
+        service.stop()

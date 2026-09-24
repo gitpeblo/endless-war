@@ -8,6 +8,7 @@ makes it impossible for a UI handler to mutate world state.
 from __future__ import annotations
 
 import argparse
+import traceback
 
 import gi
 
@@ -93,6 +94,8 @@ class WarRoom:
     def _set_speed(self, speed: str) -> None:
         self._service.submit(SetSpeed(speed))
 
+    # Intentionally unwired: no widget calls this until a faction picker
+    # exists. `--faction` binds at launch through the service instead.
     def bind_faction(self, faction_id: int | None) -> None:
         self._service.submit(BindFaction(faction_id))
 
@@ -114,7 +117,19 @@ class WarRoom:
         self.tray.set_paused(self._paused)
 
     def _on_timer(self) -> bool:
-        self.refresh()
+        # GLib silently drops a timeout source whose callback raises, which
+        # would freeze the window for good with only a stderr traceback --
+        # invisible when launched from the tray or a desktop file. Mirror
+        # the service's `_safe_publish`: report the failure where the user
+        # can see it, and keep the timer alive.
+        try:
+            self.refresh()
+        except Exception as exc:  # noqa: BLE001 - reported, not swallowed
+            traceback.print_exc()
+            try:
+                self.header.set_text(f"UI FAULT: {type(exc).__name__}: {exc}")
+            except Exception:  # noqa: BLE001 - the timer must survive
+                pass
         return True
 
     # -- lifecycle --------------------------------------------------------
