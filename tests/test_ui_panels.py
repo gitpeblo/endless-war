@@ -115,3 +115,20 @@ def test_event_log_lines_are_every_event_newest_first() -> None:
     assert len(lines) == len(view.event_log) > 20
     newest = view.event_log[-1]
     assert lines[0] == f"{newest.simulated_at.date().isoformat()}  {newest.title}: {newest.body}"
+
+
+def test_a_destroyed_faction_reads_as_destroyed_everywhere() -> None:
+    import dataclasses as _dc
+    from endless_war.ui.legend import legend_entries
+    from endless_war.ui.panels import status_rows, tray_summary
+    cfg = _load_config()
+    world = _generate_world(seed=42, config=cfg)
+    view = _build_view(world, cfg, bound_faction_id=0, speed="1x")
+    rows = tuple(_dc.replace(f, eliminated=True, provinces=0) if f.id == 0 else f for f in view.factions)
+    view = _dc.replace(view, factions=rows)
+    assert ("destroyed", "") in status_rows(view)
+    assert "destroyed" in tray_summary(view)
+    kinds = [e.kind for e in legend_entries(view)]
+    assert "bound" not in kinds, "no 'Your territory' for a destroyed faction"
+    world_view = _dc.replace(view, bound_faction_id=None)
+    assert not any(label == view.factions[0].name for label, _ in status_rows(world_view))

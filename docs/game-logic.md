@@ -205,7 +205,7 @@ How a war is fought and finished, across `ai/strategic.py`, `systems/garrison.py
 - **Reinforcement.** Each tick `reinforcement_rate_per_tick` of the reserve pool flows into armies on
   supplied own land; a faction with fewer than `min_field_armies` raises a fresh army of
   `new_army_share` of its reserves at its capital (or best-supplied province).
-- **Declaring war.** Up to `max_concurrent_wars` at once, against a bordering faction it is not yet
+- **Declaring war.** A faction in fewer than `max_concurrent_wars` wars may declare another (the limit is on the declarer: a collapsing faction can be attacked by several neighbours), against a bordering faction it is not yet
   fighting, when its strength (armies by effective power, plus a quarter of the reserves scaled by
   the share of its land that is supplied) is `war_declaration_strength_ratio` × the target's.
 - **Ending war.** Exhaustion also grows by `war_weariness_per_tick` while at war. A war ends when all

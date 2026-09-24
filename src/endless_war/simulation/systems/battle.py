@@ -114,10 +114,13 @@ def resolve_battles(
 
         attacker_losses = _apply_losses(attackers, attacker_rate)
         defender_losses = _apply_losses(defenders, defender_rate)
+        garrison_losses = 0
         if garrison > 0:
+            # Garrison strength is effective power, not men; its losses are
+            # reported but not added to the death toll (final review).
             lost = garrison * min(1.0, defender_rate * loss_mult)
             province.garrison = garrison - lost
-            defender_losses += int(lost)
+            garrison_losses = int(lost)
 
         world.factions[attacker_faction].casualties += attacker_losses
         world.factions[defender_faction].casualties += defender_losses
@@ -131,6 +134,7 @@ def resolve_battles(
             "defender_faction": defender_faction,
             "attacker_losses": attacker_losses,
             "defender_losses": defender_losses,
+            "garrison_losses": garrison_losses,
             "attacker_broke": attacker_broke,
             "defender_broke": defender_broke,
         })

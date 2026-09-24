@@ -95,7 +95,30 @@ def _settle(world: WorldState, war: War) -> list[tuple[int, int | None, int]]:
             continue
         province.owner_faction_id = holder
         annexed.append((pid, owner, holder))
+    for _pid, owner, _holder in annexed:
+        _relocate_capital(world, owner)
     return annexed
+
+
+def _relocate_capital(world: WorldState, faction_id: int | None) -> None:
+    """Move a faction's capital to its most populous province once it is annexed.
+
+    Otherwise "capital lost" stayed true for every later war (final review).
+    """
+    if faction_id is None or faction_id not in world.factions:
+        return
+    fac = world.factions[faction_id]
+    capital = world.provinces.get(fac.capital_province_id)
+    if capital is None or capital.owner_faction_id == faction_id:
+        return
+    mine = [p for p in sorted(world.provinces)
+            if world.provinces[p].controller_faction_id == faction_id]
+    if not mine:
+        return
+    new = max(mine, key=lambda p: (world.provinces[p].population, -p))
+    capital.is_capital = False
+    world.provinces[new].is_capital = True
+    fac.capital_province_id = new
 
 
 def _capitulated(world: WorldState, war: War, side: set[int], fraction: float) -> bool:
@@ -201,6 +224,8 @@ def update_diplomacy(
             other for other in _neighbouring_factions(world, fid)
             if other not in fac.at_war_with
             and not world.factions[other].eliminated
+            # A target already at war may be attacked again: limiting it
+            # shielded collapsing factions (a 243-day island at seed 99).
             and _strength(world, fid, config) > _strength(world, other, config) * ratio_needed
         ]
         if not candidates:

@@ -46,12 +46,14 @@ def status_rows(view: WorldView) -> list[tuple[str, str]]:
             (f"unknown faction {view.bound_faction_id}", "showing world")
         ]
         for faction in view.factions:
-            rows.append((faction.name, f"{faction.provinces} prov · {faction.population:,}"))
+            if not faction.eliminated:
+                rows.append((faction.name, f"{faction.provinces} prov · {faction.population:,}"))
         rows.append(("wars", f"{view.active_wars} active / {view.total_wars} total"))
         return rows
     rows: list[tuple[str, str]] = [("World", "")]
     for faction in view.factions:
-        rows.append((faction.name, f"{faction.provinces} prov · {faction.population:,}"))
+        if not faction.eliminated:
+            rows.append((faction.name, f"{faction.provinces} prov · {faction.population:,}"))
     rows.append(("wars", f"{view.active_wars} active / {view.total_wars} total"))
     return rows
 
@@ -76,6 +78,8 @@ def tray_summary(view: WorldView) -> str:
     date = view.simulated_at.date().isoformat()
     if view.bound_faction_id is not None:
         faction = next((f for f in view.factions if f.id == view.bound_faction_id), None)
+        if faction is not None and faction.eliminated:
+            return f"{date} · {faction.name} · destroyed · {view.speed}"
         if faction is not None:
             return (
                 f"{date} · {faction.name} · {faction.provinces} prov · "
@@ -84,7 +88,7 @@ def tray_summary(view: WorldView) -> str:
         # Unknown faction: show indicator and world summary
         return (
             f"{date} · unknown faction {view.bound_faction_id} · "
-            f"{len(view.factions)} factions · {view.active_wars} wars · {view.speed}"
+            f"{sum(not f.eliminated for f in view.factions)} factions · {view.active_wars} wars · {view.speed}"
         )
     return (
         f"{date} · {len(view.factions)} factions · "

@@ -16,6 +16,7 @@ from endless_war.domain.models import WorldState
 from endless_war.simulation.systems.battle import resolve_battles
 from endless_war.simulation.systems.control import (
     apply_control_changes,
+    disband_stranded_armies,
     surrender_trapped_armies,
 )
 from endless_war.simulation.systems.diplomacy import (
@@ -63,6 +64,7 @@ class SimulationEngine:
             self.world, self.rng, self.config, battle_records
         )
         surrender_records = surrender_trapped_armies(self.world, self.config)
+        disband_stranded_armies(self.world, self.config)
         update_garrisons(self.world, self.config)
         update_exhaustion(self.world, self.rng, self.config)
         note_captures(self.world, capture_records)

@@ -90,36 +90,82 @@ def apply_control_changes(
     return captures
 
 
+def _broken(army, config: dict[str, Any]) -> bool:
+    return (
+        army.organization < config["balance"]["broken_organization"]
+        or army.morale < config["balance"]["broken_morale"]
+    )
+
+
 def surrender_trapped_armies(world: WorldState, config: dict[str, Any]) -> list[dict[str, Any]]:
-    """Remove broken armies that share a province with an enemy and cannot retreat.
+    """Remove broken armies that share a province with an unbroken enemy and cannot retreat.
 
     Without this, a broken army with no friendly neighbour stood forever: it
     could not fight, recover or be destroyed (docs/decisions.md, 2026-09-23,
-    "absorbing state"). Its men count as its faction's casualties.
+    "absorbing state"). Its men count as its faction's casualties. Every army
+    is judged before any is removed, so the outcome does not depend on army
+    order, and nobody surrenders to an enemy that is itself broken.
     """
-    broken_org: float = config["balance"]["broken_organization"]
-    broken_mor: float = config["balance"]["broken_morale"]
-    records: list[dict[str, Any]] = []
+    doomed = []
     for aid in sorted(world.armies):
         army = world.armies[aid]
-        if army.organization >= broken_org and army.morale >= broken_mor:
+        if not _broken(army, config):
             continue
         at_war = world.factions[army.faction_id].at_war_with
-        enemy_here = any(
+        captor_here = any(
             other.province_id == army.province_id and other.faction_id in at_war
-            and other.manpower > 0
+            and other.manpower > 0 and not _broken(other, config)
             for other in world.armies.values()
         )
-        if not enemy_here:
+        if not captor_here:
             continue
         way_out = any(
             world.provinces[n].controller_faction_id == army.faction_id
             for n in world.provinces[army.province_id].neighbors
         )
-        if way_out:
-            continue
+        if not way_out:
+            doomed.append(aid)
+    records: list[dict[str, Any]] = []
+    for aid in doomed:
+        army = world.armies.pop(aid)
         world.factions[army.faction_id].casualties += army.manpower
         records.append({"kind": "surrender", "province_id": army.province_id,
                         "faction": army.faction_id, "men": army.manpower})
-        del world.armies[aid]
     return records
+
+
+def disband_stranded_armies(world: WorldState, config: dict[str, Any]) -> None:
+    """Send broken armies that can never recover back to the reserve pool.
+
+    A broken army on unsupplied ground with no route over its own land to a
+    supplied province, and no enemy beside it, sat at zero organization for
+    ever (final review; a consequence of the kept no-fallback-supply rule).
+    """
+    low: float = config["balance"]["low_supply_threshold"]
+    for aid in sorted(world.armies):
+        army = world.armies[aid]
+        if not _broken(army, config) or world.provinces[army.province_id].supply_value >= low:
+            continue
+        at_war = world.factions[army.faction_id].at_war_with
+        if any(o.province_id == army.province_id and o.faction_id in at_war for o in world.armies.values()):
+            continue  # an enemy is here: surrender or battle decides it
+        seen = {army.province_id}
+        frontier = [army.province_id]
+        reachable = False
+        while frontier and not reachable:
+            nxt = []
+            for pid in frontier:
+                for nid in sorted(world.provinces[pid].neighbors):
+                    if nid in seen or world.provinces[nid].controller_faction_id != army.faction_id:
+                        continue
+                    if world.provinces[nid].supply_value >= low:
+                        reachable = True
+                        break
+                    seen.add(nid)
+                    nxt.append(nid)
+                if reachable:
+                    break
+            frontier = nxt
+        if not reachable:
+            world.factions[army.faction_id].manpower += army.manpower
+            del world.armies[aid]

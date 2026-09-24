@@ -34,6 +34,8 @@ def update_movement(world: WorldState, rng: random.Random, config: dict[str, Any
     morale_recovery: float = config["balance"]["morale_recovery_per_tick"]
     min_advance_org: float = config["balance"]["min_advance_organization"]
     low_supply: float = config["balance"]["low_supply_threshold"]
+    broken_org: float = config["balance"]["broken_organization"]
+    broken_mor: float = config["balance"]["broken_morale"]
 
     for aid in sorted(world.armies):
         army = world.armies[aid]
@@ -50,11 +52,13 @@ def update_movement(world: WorldState, rng: random.Random, config: dict[str, Any
         # and retreated because it had not recovered. See docs/decisions.md,
         # 2026-09-23, "the recovery rule".
         target_id = army.destination_id
-        # An army that cannot recover where it stands (no supply) may still
+        # A broken army that cannot recover where it stands (no supply) may still
         # fall back onto its own land, however disorganized; otherwise it sat
         # at zero organization forever (seed 99, 2026-09-24).
+        broken = army.organization < broken_org or army.morale < broken_mor
         falling_back = (
-            army.supply < low_supply
+            broken
+            and army.supply < low_supply
             and target_id is not None
             and world.provinces[target_id].controller_faction_id == army.faction_id
         )
