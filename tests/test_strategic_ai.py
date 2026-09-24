@@ -199,3 +199,59 @@ def test_an_empty_hostile_province_is_always_attackable() -> None:
     w.armies[1] = Army(id=1, faction_id=0, province_id=border, manpower=500)
     choose_strategic_actions(w, random.Random(1), cfg)
     assert w.provinces[w.armies[1].destination_id].controller_faction_id == 3
+
+
+def test_an_army_holds_a_province_it_is_occupying_until_it_falls() -> None:
+    # 402 occupations started and 31 finished over three years: armies marched
+    # on before the occupation day was up, so nothing was captured.
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    target = next(p for p in sorted(w.provinces) if w.provinces[p].controller_faction_id == 3
+                  and any(w.provinces[n].controller_faction_id == 3 for n in w.provinces[p].neighbors))
+    w.armies[1] = Army(id=1, faction_id=0, province_id=target, manpower=30_000)
+    w.provinces[target].occupation = (0, 1)
+    choose_strategic_actions(w, random.Random(1), cfg)
+    assert w.armies[1].destination_id is None
+
+
+def _front_pair(w):
+    """A faction-0 province with a faction-0 neighbour and two faction-3 neighbours."""
+    for pid in sorted(w.provinces):
+        p = w.provinces[pid]
+        if p.controller_faction_id != 0:
+            continue
+        own = [n for n in p.neighbors if w.provinces[n].controller_faction_id == 0]
+        enemy = [n for n in p.neighbors if w.provinces[n].controller_faction_id == 3]
+        if own and len(enemy) >= 1:
+            return pid, own, enemy
+    raise AssertionError("premise: a 0/3 front province with a friendly neighbour")
+
+
+def test_an_army_counter_attacks_an_enemy_occupying_its_own_land() -> None:
+    # Two stacks raided each other's empty provinces in circles and never met
+    # (13,927 captures from 6 battles at seed 42). Defending your own land
+    # comes before raiding.
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    here, own, enemy = _front_pair(w)
+    w.armies[1] = Army(id=1, faction_id=0, province_id=here, manpower=30_000)
+    w.armies[2] = Army(id=2, faction_id=3, province_id=own[0], manpower=10_000)
+    choose_strategic_actions(w, random.Random(1), cfg)
+    assert w.armies[1].destination_id == own[0]
+
+
+def test_a_beatable_enemy_army_is_engaged_before_empty_land() -> None:
+    from endless_war.domain.models import Army
+    w, cfg = _war_world()
+    w.armies.clear()
+    here = next(
+        p for p in sorted(w.provinces) if w.provinces[p].controller_faction_id == 0
+        and sum(w.provinces[n].controller_faction_id == 3 for n in w.provinces[p].neighbors) >= 2
+    )
+    enemy = sorted(n for n in w.provinces[here].neighbors if w.provinces[n].controller_faction_id == 3)
+    w.armies[1] = Army(id=1, faction_id=0, province_id=here, manpower=30_000)
+    w.armies[2] = Army(id=2, faction_id=3, province_id=enemy[-1], manpower=10_000)
+    choose_strategic_actions(w, random.Random(1), cfg)
+    assert w.armies[1].destination_id == enemy[-1], "should fight the army, not walk into empty land"

@@ -155,14 +155,42 @@ def choose_strategic_actions(
                 army.destination_id = friendly[0]
             continue
 
+        here = world.provinces[army.province_id]
+        if here.occupation is not None and here.occupation[0] == army.faction_id:
+            # Hold until the occupation completes: a capture takes
+            # `occupation_ticks`, and marching on reset it every time.
+            army.stance = "occupying"
+            continue
+
+        # Targets in priority order: an enemy occupying our own land, then an
+        # enemy army we can beat, then undefended enemy land. Taking only the
+        # weakest neighbour meant always the empty one, so two stacks raided
+        # each other's rear in circles and never fought (13,927 captures from
+        # 6 battles at seed 42).
+        own = effective_power(army, world, False, terrain)
+        invaded = [
+            pid for pid in friendly
+            if _defence_of(world, pid, army.faction_id, terrain) > 0
+        ]
         hostile = _hostile_neighbours(world, army)
-        if hostile:
-            hostile.sort(key=lambda pid: (_defence_of(world, pid, army.faction_id, terrain), pid))
-            weakest = hostile[0]
-            own = effective_power(army, world, False, terrain)
-            if _defence_of(world, weakest, army.faction_id, terrain) < own * attack_ratio:
+        if invaded or hostile:
+            def beatable(pid: int) -> bool:
+                return _defence_of(world, pid, army.faction_id, terrain) < own * attack_ratio
+
+            defended = [pid for pid in hostile if _defence_of(world, pid, army.faction_id, terrain) > 0]
+            empty = [pid for pid in hostile if pid not in defended]
+            target = None
+            for group in (invaded, defended, empty):
+                options = sorted(
+                    (pid for pid in group if beatable(pid)),
+                    key=lambda pid: (_defence_of(world, pid, army.faction_id, terrain), pid),
+                )
+                if options:
+                    target = options[0]
+                    break
+            if target is not None:
                 army.stance = "aggressive"
-                army.destination_id = weakest
+                army.destination_id = target
             else:
                 army.stance = "defensive"
             continue
