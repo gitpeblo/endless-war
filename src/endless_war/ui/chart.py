@@ -22,14 +22,16 @@ from endless_war.app.view_model import CasualtyReading, FactionRow  # noqa: E402
 from endless_war.ui.colors import faction_rgb  # noqa: E402
 from endless_war.ui.map_view import BACKGROUND  # noqa: E402
 
-MARGIN_LEFT = 52.0
+MARGIN_LEFT = 66.0  # room for the rotated y title and the tick values
 MARGIN_RIGHT = 150.0  # room for the direct labels
 MARGIN_TOP = 12.0
-MARGIN_BOTTOM = 26.0
+MARGIN_BOTTOM = 40.0  # room for the date ticks and the x title
 FONT_SIZE = 11.0
 LINE_WIDTH = 2.0
 LABEL_GAP = FONT_SIZE + 3
 MIN_X_LABEL_SPACING = 50.0
+Y_TITLE = "Cumulative deaths"
+X_TITLE = "Simulated date"
 TEXT_RGB = (0.85, 0.85, 0.85)
 MUTED_RGB = (0.58, 0.59, 0.62)
 GRID_RGBA = (1.0, 1.0, 1.0, 0.08)
@@ -163,6 +165,19 @@ def _x_axis(cr, t0: datetime, t1: datetime, x_of, x0: float, x1: float, y1: floa
         cr.show_text(label)
 
 
+def _axis_titles(cr, x0: float, x1: float, y0: float, y1: float, height: float) -> None:
+    cr.set_source_rgb(*MUTED_RGB)
+    extents = cr.text_extents(X_TITLE)
+    cr.move_to((x0 + x1) / 2 - extents.x_advance / 2, height - 4)
+    cr.show_text(X_TITLE)
+    extents = cr.text_extents(Y_TITLE)
+    cr.save()
+    cr.move_to(4 + FONT_SIZE, (y0 + y1) / 2 + extents.x_advance / 2)
+    cr.rotate(-math.pi / 2)
+    cr.show_text(Y_TITLE)
+    cr.restore()
+
+
 def _direct_labels(cr, ends: list[tuple[FactionRow, float]], x1: float) -> None:
     ys = spread_labels([y for _, y in ends], LABEL_GAP)
     for (faction, _), y in zip(ends, ys):
@@ -236,6 +251,7 @@ def render_casualty_chart(
         cr.move_to(x0, round(y1) + 0.5)
         cr.line_to(x1, round(y1) + 0.5)
         cr.stroke()
+        _axis_titles(cr, x0, x1, y0, y1, height)
         message = "No history yet" if not readings else "No faction selected"
         _centred_text(cr, message, (x0 + x1) / 2, (y0 + y1) / 2)
         return
@@ -256,6 +272,7 @@ def render_casualty_chart(
 
     _y_axis(cr, ticks, y_of, x0, x1)
     _x_axis(cr, t0, t1, x_of, x0, x1, y1)
+    _axis_titles(cr, x0, x1, y0, y1, height)
 
     # One reading per horizontal pixel is all the line can show.
     stride = max(1, len(readings) // max(1, int(x1 - x0)))

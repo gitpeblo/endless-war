@@ -173,3 +173,21 @@ def test_a_century_of_readings_renders() -> None:
         CasualtyReading(T0 + timedelta(days=d), ((0, d), (1, d * 3))) for d in range(36_500)
     )
     _render(readings, {0, 1}, hover_x=300.0)
+
+
+def _bright_pixels(surface, xs: range, ys: range) -> int:
+    # Anything clearly lighter than the background is ink: text or a mark.
+    data, stride = surface.get_data(), surface.get_stride()
+    return sum(
+        1
+        for y in ys
+        for x in xs
+        if sum(data[y * stride + x * 4 + k] for k in range(3)) > 3 * 80
+    )
+
+
+def test_the_axes_have_titles() -> None:
+    # Asked for by the user: tick values alone do not say what is measured.
+    surface = _render(_readings(60), {0, 1})
+    assert _bright_pixels(surface, range(0, 16), range(HEIGHT)) > 20, "y-axis title"
+    assert _bright_pixels(surface, range(WIDTH), range(HEIGHT - 9, HEIGHT)) > 20, "x-axis title"
