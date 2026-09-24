@@ -184,3 +184,49 @@ def test_an_eliminated_faction_never_declares_war() -> None:
     engine.run(400)
     assert w.factions[4].eliminated
     assert not any(4 in war.attackers | war.defenders for war in w.wars.values() if war.status == "active")
+
+
+def _ending_war():
+    """A 3-vs-4 war that ends on stalemate at the next update."""
+    import random as _random
+    from endless_war.config import load_config as _load
+    from endless_war.domain.models import War
+    from endless_war.simulation.worldgen import generate_world as _gen
+
+    cfg = _load()
+    w = _gen(seed=42, config=cfg)
+    w.factions[3].at_war_with = {4}
+    w.factions[4].at_war_with = {3}
+    w.tick_count = cfg["balance"]["peace_stalemate_ticks"] + 10
+    w.wars[w.next_war_id] = War(id=w.next_war_id, attackers={3}, defenders={4},
+                                started_at=w.current_time, last_capture_tick=0)
+    w.next_war_id += 1
+    return w, cfg, _random.Random(1)
+
+
+def test_peace_hands_occupied_land_to_the_occupier() -> None:
+    w, cfg, rng = _ending_war()
+    pid = next(p for p in sorted(w.provinces) if w.provinces[p].owner_faction_id == 4)
+    w.provinces[pid].controller_faction_id = 3
+    events = update_diplomacy(w, rng, cfg)
+    assert w.provinces[pid].owner_faction_id == 3
+    peace = next(e for e in events if e["kind"] == "peace")
+    assert (pid, 4, 3) in peace["annexed"]
+
+
+def test_peace_settles_a_third_partys_land_the_winner_holds() -> None:
+    w, cfg, rng = _ending_war()
+    pid = next(p for p in sorted(w.provinces) if w.provinces[p].owner_faction_id == 1)
+    w.provinces[pid].controller_faction_id = 3  # taken from faction 1 in an earlier war
+    update_diplomacy(w, rng, cfg)
+    assert w.provinces[pid].owner_faction_id == 3
+
+
+def test_land_still_disputed_with_its_owner_is_not_settled() -> None:
+    w, cfg, rng = _ending_war()
+    w.factions[3].at_war_with.add(1)
+    w.factions[1].at_war_with = {3}
+    pid = next(p for p in sorted(w.provinces) if w.provinces[p].owner_faction_id == 1)
+    w.provinces[pid].controller_faction_id = 3
+    update_diplomacy(w, rng, cfg)
+    assert w.provinces[pid].owner_faction_id == 1, "3 and 1 are still at war over it"

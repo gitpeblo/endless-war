@@ -72,6 +72,27 @@ def eliminate_landless(world: WorldState) -> list[dict[str, Any]]:
     return events
 
 
+def _settle(world: WorldState, war: War) -> list[tuple[int, int | None, int]]:
+    """Occupied land becomes the occupier's when a war ends.
+
+    For every province held by one of this war's belligerents but owned by
+    someone else, the owner becomes the holder, unless the two are still at war
+    (in another war) over it. Runs after the war's flags are cleared.
+    """
+    involved = war.attackers | war.defenders
+    annexed: list[tuple[int, int | None, int]] = []
+    for pid in sorted(world.provinces):
+        province = world.provinces[pid]
+        holder, owner = province.controller_faction_id, province.owner_faction_id
+        if holder is None or holder not in involved or owner == holder:
+            continue
+        if owner in world.factions and holder in world.factions[owner].at_war_with:
+            continue
+        province.owner_faction_id = holder
+        annexed.append((pid, owner, holder))
+    return annexed
+
+
 def _strength(world: WorldState, faction_id: int) -> float:
     army = sum(a.manpower for a in world.armies.values() if a.faction_id == faction_id)
     return army + world.factions[faction_id].manpower * 0.5
@@ -122,6 +143,7 @@ def update_diplomacy(
             "attacker": sorted(war.attackers)[0],
             "defender": sorted(war.defenders)[0],
             "reason": "elimination" if destroyed else "ceasefire",
+            "annexed": _settle(world, war),
         })
 
     for fid in sorted(world.factions):

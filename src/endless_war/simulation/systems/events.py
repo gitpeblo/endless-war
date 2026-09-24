@@ -59,6 +59,15 @@ def record_events(
             _add(world, "diplomacy", "critical", "Peace signed",
                  f"{name(attacker)} and {name(defender)} have signed a ceasefire.",
                  [attacker, defender])
+        if event["kind"] == "peace":
+            ceded: dict[tuple[int, int | None], int] = {}
+            for _pid, owner, holder in event.get("annexed", ()):
+                ceded[(holder, owner)] = ceded.get((holder, owner), 0) + 1
+            for (holder, owner), count in sorted(ceded.items(), key=lambda kv: (kv[0][0], kv[0][1] or -1)):
+                plural = "province" if count == 1 else "provinces"
+                _add(world, "territory", "major", "Territory ceded",
+                     f"{name(holder)} annexes {count} {plural} from {name(owner)}.",
+                     [holder] + ([owner] if owner is not None else []))
 
     for capture in capture_records:
         _add(world, "territory", "major", "Province captured",

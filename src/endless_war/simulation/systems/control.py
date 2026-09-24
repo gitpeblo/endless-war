@@ -1,7 +1,8 @@
 """Occupation, retreat, and army cleanup.
 
-Control changes; ownership does not. Keeping `owner_faction_id` fixed is what
-lets later work model liberation, resistance, and war-goal evaluation.
+Control changes here; ownership does not. During a war an occupier only
+controls what it takes; when the war ends, `diplomacy._settle` makes occupied
+land the occupier's, unless the owner is still at war with it over it.
 """
 
 from __future__ import annotations
