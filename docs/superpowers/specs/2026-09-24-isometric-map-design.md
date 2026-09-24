@@ -196,7 +196,7 @@ The widget repaints at most every 250 ms.
   render without raising.
 - **legend:** the terrain section lists the five terrains in order; the legend
   still paints each faction's colour.
-- **By eye:** launch `bin/run_gui.sh --faction 0 --speed 16x`, capture the Map
+- **By eye:** launch `bin/endless-war --faction 0 --speed 16x`, capture the Map
   tab with `window.draw()` into a cairo surface, and check ownership, markers,
   legend and scaling at the default and a maximised window.
 

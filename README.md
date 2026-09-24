@@ -9,8 +9,8 @@ The game simulates multiple AI-controlled factions, shifting front lines, logist
 The War Room window shows an isometric pixel-art map of the provinces and their terrain (scroll to zoom, drag with the middle button to pan), a status panel (the whole world, or one faction with `--faction`), a legend and the event feed, and keeps running in the tray when you close it. A History tab charts each faction's cumulative dead over time (tick factions on and off to compare) above the full event log:
 
 ```bash
-bin/run_gui.sh                                  # watch, seed 42, 1x (a 6-hour tick per second)
-bin/run_gui.sh --faction 0 --speed 16x --seed 7 # follow faction 0, fast
+bin/endless-war                                  # watch, seed 42, 1x (a 6-hour tick per second)
+bin/endless-war --faction 0 --speed 16x --seed 7 # follow faction 0, fast
 ```
 
 It uses the system GTK 3 and Ayatana indicator packages that Ubuntu MATE already ships. Quit from the tray menu; closing the window only hides it.
@@ -63,7 +63,7 @@ For the exact formulas and the config values that tune them, see
 - `config/` — default configuration and balancing values
 - `assets/` — future icons, map assets, and UI resources
 - `data/saves/` — local save-game location placeholder
-- `bin/` — `run_gui.sh`, the game launcher
+- `bin/` — `endless-war`, the game launcher
 
 ## Recommended development order
 

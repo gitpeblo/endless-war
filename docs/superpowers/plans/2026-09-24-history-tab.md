@@ -1481,7 +1481,7 @@ git commit -m "feat: Map and History tabs with toggleable casualty chart and ful
 - [ ] **Step 1: Launch and look**
 
 ```bash
-bin/run_gui.sh --faction 0 --speed 16x &
+bin/endless-war --faction 0 --speed 16x &
 ```
 
 Let it run for ~90 seconds (about a simulated year at 16x). Capture both tabs. `import -window "Endless War" <file>` works on this machine, and root-window capture comes back blank. To show the History tab without a mouse, launch a second copy from a Python snippet that builds `WarRoom` exactly as `main()` does, then calls `room.notebook.set_current_page(1)`.
